@@ -1,0 +1,53 @@
+.osc-section {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.osc-panel, .unison-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.osc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 0.2s;
+}
+
+.osc-content.disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.osc-knobs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.osc2-toggle {
+  align-self: flex-start;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s;
+}
+
+.osc2-toggle.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}

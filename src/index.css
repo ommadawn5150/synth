@@ -1,0 +1,61 @@
+/* ── CSS Variables (set by theme system) ───────────────────── */
+:root {
+  --bg: #F0EDE8;
+  --bg-panel: #E4E0DA;
+  --bg-section: #D8D3CC;
+  --accent: #FF6B35;
+  --accent-dim: #CC5528;
+  --text: #1A1A1A;
+  --text-dim: #6B6560;
+  --border: #C8C3BB;
+  --key-white: #FAFAF8;
+  --key-black: #2A2520;
+  --key-active: #FF6B35;
+  --knob-track: #C8C3BB;
+  --knob-fill: #FF6B35;
+}
+
+/* ── Reset & Base ───────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  font-family: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
