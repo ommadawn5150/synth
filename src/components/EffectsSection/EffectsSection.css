@@ -1,0 +1,28 @@
+.effects-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.effect-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.effect-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+
+.effect-knobs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

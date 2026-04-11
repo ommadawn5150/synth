@@ -1,0 +1,11 @@
+.lfo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.lfo-knobs {
+  display: flex;
+  gap: 10px;
+}
