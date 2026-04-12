@@ -17,11 +17,13 @@
   overflow-y: auto;
 }
 
-/* Desktop shows all panels, mobile shows tabs */
+/* Desktop shows all panels, mobile shows tabs.
+   Mobile = portrait phones (≤768px) OR landscape phones (height ≤500px). */
 .desktop-layout { display: flex; }
 .mobile-layout  { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 768px),
+       (max-height: 500px) and (orientation: landscape) {
   .desktop-layout { display: none; }
   .mobile-layout  { display: flex; }
 }
@@ -41,18 +43,24 @@
   flex-shrink: 0;
 }
 
-/* ── Mobile Tabs ─────────────────────────────────────────── */
+/* ── Mobile Layout ───────────────────────────────────────── */
+/* Override synth-body overflow so tab-panel and sequencer
+   each scroll independently instead of the whole body scrolling. */
+.synth-body.mobile-layout {
+  overflow-y: hidden;
+}
+
+/* Tab bar — no horizontal scroll needed with 5 tabs */
 .tab-bar {
   display: flex;
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
   flex-shrink: 0;
-  overflow-x: auto;
 }
 
 .tab-btn {
   flex: 1;
-  min-width: 48px;
+  min-width: 0;
   padding: 10px 4px;
   background: none;
   border: none;
@@ -71,11 +79,27 @@
   border-bottom-color: var(--accent);
 }
 
+/* Synth section panel — scrollable, takes remaining space */
 .tab-panel {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Sequencer — always visible at bottom, independently scrollable */
+.mobile-seq {
+  flex-shrink: 0;
+  max-height: 48vh;
+  overflow-y: auto;
+  border-top: 2px solid var(--border);
+}
+
+/* In landscape on a small phone, give sequencer less vertical space */
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-seq { max-height: 55vh; }
+  .tab-panel  { min-height: 80px; }
 }
 
 /* ── Sections (shared) ────────────────────────────────────── */

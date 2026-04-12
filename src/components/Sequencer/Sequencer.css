@@ -3,7 +3,6 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  border-top: 1px solid var(--border);
 }
 
 /* ── Controls ────────────────────────────────────── */
@@ -79,7 +78,8 @@
   gap: 3px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px),
+       (max-height: 500px) and (orientation: landscape) {
   .seq-grid { grid-template-columns: repeat(8, 1fr); }
 }
 
