@@ -37,7 +37,7 @@ export function FilterSection() {
             onChange={v => updateParam('filter', 'rolloff', v)} />
         </div>
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Slider label="Cutoff" value={f.frequency} min={20} max={20000} log
+          <Slider label="Cutoff" value={f.frequency} min={40} max={20000} log
             formatValue={v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v)}
             unit=" Hz" onChange={v => updateParam('filter', 'frequency', Math.round(v))} />
           <Slider label="Res" value={f.Q} min={0.1} max={20} step={0.1}
