@@ -83,12 +83,12 @@ export class SynthEngine {
     [...this.voices.keys()].forEach(n => this.noteOff(n));
   }
 
-  // Sequencer trigger
-  triggerNote(note, time) {
+  // Sequencer trigger — called at audio-scheduled time
+  triggerNote(note, time, velocity = 1) {
     const { osc1, osc2, env: ep } = this.params;
     const stepLen = Tone.Time('16n').toSeconds() * 0.8;
 
-    const voiceOut = new Tone.Gain(1).connect(this.voiceBus);
+    const voiceOut = new Tone.Gain(velocity).connect(this.voiceBus);
     const envelope = new Tone.AmplitudeEnvelope({ attack: ep.attack, decay: ep.decay, sustain: ep.sustain, release: ep.release }).connect(voiceOut);
 
     const freq = Tone.Frequency(note).toFrequency();
@@ -101,6 +101,12 @@ export class SynthEngine {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       oscillator2 = new Tone.Oscillator({ type: osc2.type, frequency: freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12), detune: osc2.detune }).connect(osc2Gain);
       oscillator2.start(time);
+    }
+
+    // Connect pitch LFO if active
+    if (this.params.lfo.destination === 'pitch' && this.params.lfo.enabled && this.params.lfo.depth > 0) {
+      try { this.lfo.connect(oscillator1.detune); } catch(_) {}
+      if (oscillator2) { try { this.lfo.connect(oscillator2.detune); } catch(_) {} }
     }
 
     envelope.triggerAttack(time);
@@ -139,16 +145,22 @@ export class SynthEngine {
       oscillator2.start();
     }
 
+    // Connect pitch LFO if active
+    if (this.params.lfo.destination === 'pitch' && this.params.lfo.enabled && this.params.lfo.depth > 0) {
+      if (oscillator1) { try { this.lfo.connect(oscillator1.detune); } catch(_) {} }
+      if (oscillator2) { try { this.lfo.connect(oscillator2.detune); } catch(_) {} }
+    }
+
     envelope.triggerAttack();
     return { osc1: oscillator1, osc2: oscillator2, env: envelope, osc1Gain, osc2Gain, voiceOut };
   }
 
   // ─── LFO ─────────────────────────────────────────────────────────
   _connectLFO() {
-    if (this._lfoTarget) {
-      try { this.lfo.disconnect(this._lfoTarget); } catch (_) {}
-      this._lfoTarget = null;
-    }
+    // Disconnect from ALL previous targets first (safe, avoids stale connections)
+    try { this.lfo.disconnect(); } catch (_) {}
+    this._lfoTarget = null;
+
     const { destination, depth, enabled } = this.params.lfo;
     if (!enabled || depth === 0) return;
 
@@ -163,6 +175,18 @@ export class SynthEngine {
       this.lfo.max = 1;
       this._lfoTarget = this.masterGain.gain;
       this.lfo.connect(this.masterGain.gain);
+    } else if (destination === 'pitch') {
+      const depthCents = depth * 200; // depth=1 → ±200 cents (±2 semitones)
+      this.lfo.min = -depthCents;
+      this.lfo.max = depthCents;
+      this._lfoTarget = 'pitch';
+      // Connect to all currently active keyboard voices
+      this.voices.forEach(voiceList => {
+        voiceList.forEach(v => {
+          try { if (v.osc1) this.lfo.connect(v.osc1.detune); } catch(_) {}
+          try { if (v.osc2) this.lfo.connect(v.osc2.detune); } catch(_) {}
+        });
+      });
     }
   }
 

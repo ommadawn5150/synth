@@ -10,14 +10,18 @@ export function Sequencer() {
   const {
     seq, scaleNotes,
     seqToggle, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
+    seqPresets, saveSeqPreset, loadSeqPreset, deleteSeqPreset,
   } = useSynth();
 
   const [notePickerIdx, setNotePickerIdx] = useState(null);
+  const [saveName, setSaveName] = useState('');
+  const [showSaveInput, setShowSaveInput] = useState(false);
   const longPressTimer = useRef(null);
   const didLongPress = useRef(false);
   const pickerRef = useRef(null);
+  const saveInputRef = useRef(null);
 
-  // Close picker when clicking outside
+  // Close note picker when clicking outside
   useEffect(() => {
     if (notePickerIdx === null) return;
     const onPointerDown = (e) => {
@@ -27,12 +31,16 @@ export function Sequencer() {
     return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [notePickerIdx]);
 
+  // Focus save input when it appears
+  useEffect(() => {
+    if (showSaveInput) saveInputRef.current?.focus();
+  }, [showSaveInput]);
+
   // ── Step interactions ──────────────────────────────────────────
   function openPicker(i) {
     setNotePickerIdx(prev => prev === i ? null : i);
   }
 
-  // Desktop: click = toggle, right-click = note picker
   function handleClick(i) {
     if (didLongPress.current) { didLongPress.current = false; return; }
     setSeqStep(i, { active: !seq.steps[i].active });
@@ -43,13 +51,11 @@ export function Sequencer() {
     openPicker(i);
   }
 
-  // Mobile: touchstart starts long-press timer
   function handleTouchStart(e, i) {
     didLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
       didLongPress.current = true;
       openPicker(i);
-      // Light haptic feedback if available
       navigator.vibrate?.(30);
     }, LONG_PRESS_MS);
   }
@@ -61,6 +67,16 @@ export function Sequencer() {
   function handleNoteSelect(i, note) {
     setSeqStep(i, { note, active: true });
     setNotePickerIdx(null);
+  }
+
+  // ── Preset interactions ────────────────────────────────────────
+  function handleSave(e) {
+    e.preventDefault();
+    const name = saveName.trim();
+    if (!name) return;
+    saveSeqPreset(name);
+    setSaveName('');
+    setShowSaveInput(false);
   }
 
   return (
@@ -136,7 +152,7 @@ export function Sequencer() {
         ))}
       </div>
 
-      {/* Note picker — inline below grid, full width */}
+      {/* Note picker */}
       {notePickerIdx !== null && (
         <div className="note-picker-bar" ref={pickerRef}>
           <span className="note-picker-label">Step {notePickerIdx + 1}</span>
@@ -154,6 +170,35 @@ export function Sequencer() {
           <button className="note-picker-close" onClick={() => setNotePickerIdx(null)}>×</button>
         </div>
       )}
+
+      {/* Preset bar */}
+      <div className="seq-preset-bar">
+        <span className="seq-label">PRESETS</span>
+        <div className="seq-preset-list">
+          {seqPresets.map(p => (
+            <span key={p.id} className="seq-preset-item">
+              <button className="seq-preset-btn" onClick={() => loadSeqPreset(p)}>{p.name}</button>
+              <button className="seq-preset-del" onClick={() => deleteSeqPreset(p.id)}>×</button>
+            </span>
+          ))}
+        </div>
+        {showSaveInput ? (
+          <form className="seq-save-form" onSubmit={handleSave}>
+            <input
+              ref={saveInputRef}
+              className="seq-save-input"
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              placeholder="preset name"
+              maxLength={24}
+            />
+            <button type="submit" className="seq-count-btn active" disabled={!saveName.trim()}>Save</button>
+            <button type="button" className="seq-count-btn" onClick={() => { setShowSaveInput(false); setSaveName(''); }}>×</button>
+          </form>
+        ) : (
+          <button className="seq-count-btn" onClick={() => setShowSaveInput(true)}>+ Save</button>
+        )}
+      </div>
 
       <div className="seq-hint">
         Tap: on/off &nbsp;·&nbsp; Long press / ✎ / Right-click: select note
