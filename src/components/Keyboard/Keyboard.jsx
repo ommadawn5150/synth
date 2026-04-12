@@ -80,6 +80,7 @@ export function Keyboard() {
 
   // Mouse / touch events
   const onPointerDown = (e, note) => {
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     triggerOn(note);
   };
@@ -95,7 +96,7 @@ export function Keyboard() {
 
   return (
     <div className="keyboard">
-      <div className="keys-container">
+      <div className="keys-container" onContextMenu={e => e.preventDefault()}>
         {ALL_KEYS.filter((k) => !k.isBlack).map((key, i) => {
           const whiteIndex = ALL_KEYS.filter((k) => !k.isBlack).indexOf(key);
           return (

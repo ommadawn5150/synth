@@ -80,6 +80,7 @@ export function SynthProvider({ children }) {
     else if (section === 'env')    engine.setEnv(key, value);
     else if (section === 'lfo')    engine.setLFO(key, value);
     else if (section === 'unison') engine.setUnison(key, value);
+    else if (section === 'osc3')   engine.setOsc3(key, value);
     else if (section === 'amp')    engine.setAmp(value);
   }
 

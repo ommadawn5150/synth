@@ -1,5 +1,6 @@
 const defaults = {
   osc1:   { enabled: true },
+  osc3:   { type: 'white', volume: 0, enabled: false },
   filter: { rolloff: -24, enabled: true },
   lfo:    { enabled: true },
   effects: {
@@ -13,6 +14,7 @@ function p(preset) {
   return {
     ...preset,
     osc1:   { ...defaults.osc1,   ...preset.osc1 },
+    osc3:   { ...defaults.osc3,   ...preset.osc3 },
     filter: { ...defaults.filter, ...preset.filter },
     lfo:    { ...defaults.lfo,    ...preset.lfo },
     effects: {

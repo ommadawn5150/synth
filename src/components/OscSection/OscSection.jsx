@@ -19,6 +19,12 @@ const OCTAVES = [
   { value:  2, label: '+2' },
 ];
 
+const NOISE_TYPES = [
+  { value: 'white', label: 'W' },
+  { value: 'pink',  label: 'P' },
+  { value: 'brown', label: 'B' },
+];
+
 function OscPanel({ label, oscKey }) {
   const { params, updateParam } = useSynth();
   const osc = params[oscKey];
@@ -47,6 +53,26 @@ function OscPanel({ label, oscKey }) {
   );
 }
 
+function NoisePanel() {
+  const { params, updateParam } = useSynth();
+  const osc3 = params.osc3 ?? { type: 'white', volume: 0, enabled: false };
+
+  return (
+    <div className="osc-panel noise-panel">
+      <div className="section-header">
+        <div className="section-title">OSC 3</div>
+        <Toggle value={osc3.enabled} onChange={v => updateParam('osc3', 'enabled', v)} />
+      </div>
+      <div className={`osc-content ${!osc3.enabled ? 'disabled' : ''}`}>
+        <Selector label="Noise" options={NOISE_TYPES} value={osc3.type}
+          onChange={v => updateParam('osc3', 'type', v)} />
+        <Slider label="Vol" value={osc3.volume} min={0} max={1} step={0.01}
+          decimals={2} onChange={v => updateParam('osc3', 'volume', v)} />
+      </div>
+    </div>
+  );
+}
+
 export function OscSection() {
   const { params, updateParam } = useSynth();
   const uni = params.unison;
@@ -56,6 +82,8 @@ export function OscSection() {
       <OscPanel label="OSC 1" oscKey="osc1" />
       <div className="section-divider" />
       <OscPanel label="OSC 2" oscKey="osc2" />
+      <div className="section-divider" />
+      <NoisePanel />
       <div className="section-divider" />
       <div className="unison-panel">
         <div className="section-title">Unison</div>
