@@ -25,6 +25,10 @@ export function SynthProvider({ children }) {
     catch { return []; }
   });
   const [seq, setSeq] = useState(() => JSON.parse(JSON.stringify(DEFAULT_SEQ)));
+  const [seqPresets, setSeqPresets] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('synth_seq_presets') || '[]'); }
+    catch { return []; }
+  });
 
   useEffect(() => {
     const engine = new SynthEngine();
@@ -129,6 +133,35 @@ export function SynthProvider({ children }) {
     setSeq(prev => ({ ...prev, root, scale }));
   }
 
+  function saveSeqPreset(name) {
+    const preset = {
+      id: `seq_${Date.now()}`,
+      name,
+      bpm: seq.bpm,
+      stepCount: seq.stepCount,
+      steps: JSON.parse(JSON.stringify(seq.steps)),
+      root: seq.root,
+      scale: seq.scale,
+    };
+    const updated = [...seqPresets.filter(p => p.name !== name), preset];
+    setSeqPresets(updated);
+    localStorage.setItem('synth_seq_presets', JSON.stringify(updated));
+  }
+
+  function loadSeqPreset(preset) {
+    const steps = Array.from({ length: preset.stepCount }, (_, i) => preset.steps[i] ?? defaultStep());
+    setSeq(prev => ({ ...prev, bpm: preset.bpm, stepCount: preset.stepCount, steps, root: preset.root, scale: preset.scale }));
+    seqEngineRef.current?.setBPM(preset.bpm);
+    seqEngineRef.current?.setStepCount(preset.stepCount);
+    seqEngineRef.current?.updateStepData(steps);
+  }
+
+  function deleteSeqPreset(id) {
+    const updated = seqPresets.filter(p => p.id !== id);
+    setSeqPresets(updated);
+    localStorage.setItem('synth_seq_presets', JSON.stringify(updated));
+  }
+
   const scaleNotes = buildScaleNotes(seq.root, SCALES[seq.scale] || SCALES.minor);
 
   return (
@@ -138,6 +171,7 @@ export function SynthProvider({ children }) {
       noteOn, noteOff,
       seq, scaleNotes,
       seqToggle, seqStop, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
+      seqPresets, saveSeqPreset, loadSeqPreset, deleteSeqPreset,
     }}>
       {children}
     </SynthContext.Provider>
