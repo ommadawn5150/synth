@@ -1,17 +1,13 @@
 import * as Tone from 'tone';
 
-const UNISON_DETUNE_SPREADS = {
-  1: [0],
-  2: [-10, 10],
-  3: [-15, 0, 15],
-  4: [-20, -7, 7, 20],
-  7: [-30, -20, -10, 0, 10, 20, 30],
-};
+const UNISON_SPREADS = { 1:[0], 2:[-10,10], 3:[-15,0,15], 4:[-20,-7,7,20], 7:[-30,-20,-10,0,10,20,30] };
 
 export class SynthEngine {
   constructor() {
-    this.voices = new Map(); // note -> [voice objects]
+    this.voices = new Map();
     this.params = this._defaultParams();
+    this._lfoTarget = null;
+    this._started = false;
     this._buildChain();
   }
 
@@ -25,7 +21,7 @@ export class SynthEngine {
       lfo: { type: 'sine', rate: 2, depth: 0, destination: 'filter' },
       effects: {
         chorus: { rate: 1.5, depth: 0.5, wet: 0 },
-        delay: { time: '8n', feedback: 0.3, wet: 0 },
+        delay: { time: 0.25, feedback: 0.3, wet: 0 },
         reverb: { decay: 2.5, wet: 0 },
       },
       amp: { volume: 0.75 },
@@ -33,147 +29,114 @@ export class SynthEngine {
   }
 
   _buildChain() {
-    // Master gain
     this.masterGain = new Tone.Gain(this.params.amp.volume).toDestination();
 
-    // Effects
-    this.reverb = new Tone.Reverb({
-      decay: this.params.effects.reverb.decay,
-      wet: this.params.effects.reverb.wet,
-    });
-    this.delay = new Tone.FeedbackDelay({
-      delayTime: this.params.effects.delay.time,
-      feedback: this.params.effects.delay.feedback,
-      wet: this.params.effects.delay.wet,
-    });
-    this.chorus = new Tone.Chorus({
-      rate: this.params.effects.chorus.rate,
-      depth: this.params.effects.chorus.depth,
-      wet: this.params.effects.chorus.wet,
-    }).start();
+    // Effects (serial: chorus → delay → reverb → master)
+    this.reverb = new Tone.Reverb({ decay: this.params.effects.reverb.decay, wet: 0 });
+    this.reverb.generate(); // async, ok since wet=0 initially
+    this.delay = new Tone.FeedbackDelay({ delayTime: this.params.effects.delay.time, feedback: this.params.effects.delay.feedback, wet: 0 });
+    this.chorus = new Tone.Chorus({ rate: this.params.effects.chorus.rate, depth: this.params.effects.chorus.depth, wet: 0 }).start();
 
-    // Effects chain: chorus -> delay -> reverb -> master
     this.chorus.connect(this.delay);
     this.delay.connect(this.reverb);
     this.reverb.connect(this.masterGain);
 
-    // Filter
-    this.filter = new Tone.Filter({
-      type: this.params.filter.type,
-      frequency: this.params.filter.frequency,
-      Q: this.params.filter.Q,
-    }).connect(this.chorus);
+    // Filter → effects chain
+    this.filter = new Tone.Filter({ type: this.params.filter.type, frequency: this.params.filter.frequency, Q: this.params.filter.Q });
+    this.filter.connect(this.chorus);
+
+    // Voice bus → filter
+    this.voiceBus = new Tone.Gain(1).connect(this.filter);
 
     // LFO
-    this.lfo = new Tone.LFO({
-      type: this.params.lfo.type,
-      frequency: this.params.lfo.rate,
-      min: 0,
-      max: this.params.lfo.depth,
-    }).start();
-    this._connectLFO();
-
-    // Voice gain bus (all voices feed here)
-    this.voiceBus = new Tone.Gain(1).connect(this.filter);
+    this.lfo = new Tone.LFO({ type: this.params.lfo.type, frequency: this.params.lfo.rate, min: 0, max: 0 }).start();
+    // (depth=0 initially so LFO has no effect until set)
   }
 
-  _connectLFO() {
-    if (this._lfoConnection) {
-      this._lfoConnection.dispose();
-      this._lfoConnection = null;
+  // ─── AudioContext unlock ────────────────────────────────────────
+  async _ensureStarted() {
+    if (!this._started) {
+      await Tone.start();
+      this._started = true;
     }
-    const dest = this.params.lfo.destination;
-    const depth = this.params.lfo.depth;
-
-    if (dest === 'filter') {
-      const baseFreq = this.params.filter.frequency;
-      this.lfo.min = 0;
-      this.lfo.max = baseFreq * depth * 2;
-      this._lfoConnection = this.lfo.connect(this.filter.frequency);
-    } else if (dest === 'amp') {
-      this.lfo.min = 0;
-      this.lfo.max = depth;
-    }
-    // pitch LFO handled per-voice
   }
 
   // ─── Note On/Off ────────────────────────────────────────────────
-  noteOn(note) {
+  async noteOn(note) {
+    await this._ensureStarted();
     if (this.voices.has(note)) this.noteOff(note);
 
-    Tone.start();
-
-    const unisonCount = this.params.unison.voices;
-    const spread = this.params.unison.spread;
-    const detuneOffsets = UNISON_DETUNE_SPREADS[unisonCount] || [0];
-    const voiceList = [];
-
-    detuneOffsets.forEach((spreadOffset) => {
-      const voice = this._createVoice(note, spreadOffset * spread / 15);
-      voiceList.push(voice);
-    });
-
+    const spreads = UNISON_SPREADS[this.params.unison.voices] || [0];
+    const spreadScale = this.params.unison.spread / 15;
+    const voiceList = spreads.map(offset => this._createVoice(note, offset * spreadScale));
     this.voices.set(note, voiceList);
   }
 
   noteOff(note) {
     const voiceList = this.voices.get(note);
     if (!voiceList) return;
-    voiceList.forEach((v) => {
-      v.env.triggerRelease();
-      const releaseTime = this.params.env.release;
+    const releaseTime = (this.params.env.release + 0.1) * 1000;
+    voiceList.forEach(v => {
+      try { v.env.triggerRelease(); } catch (_) {}
       setTimeout(() => {
-        try {
-          v.osc1.stop().dispose();
-          v.osc2?.stop().dispose();
-          v.env.dispose();
-          v.osc1Gain.dispose();
-          v.osc2Gain?.dispose();
-        } catch (_) {}
-      }, (releaseTime + 0.2) * 1000);
+        try { v.osc1.stop(); v.osc1.dispose(); } catch (_) {}
+        try { v.osc2?.stop(); v.osc2?.dispose(); } catch (_) {}
+        try { v.env.dispose(); } catch (_) {}
+        try { v.osc1Gain.dispose(); } catch (_) {}
+        try { v.osc2Gain?.dispose(); } catch (_) {}
+        try { v.voiceOut.dispose(); } catch (_) {}
+      }, releaseTime);
     });
     this.voices.delete(note);
   }
 
+  allNotesOff() {
+    [...this.voices.keys()].forEach(n => this.noteOff(n));
+  }
+
+  // Sequencer: trigger a note for a fixed duration
+  async triggerNote(note, duration = 0.1) {
+    await this._ensureStarted();
+    const now = Tone.now();
+    const spreads = UNISON_SPREADS[this.params.unison.voices] || [0];
+    const spreadScale = this.params.unison.spread / 15;
+    spreads.forEach(offset => {
+      const v = this._createVoice(note, offset * spreadScale);
+      const releaseAt = now + duration;
+      Tone.getDraw().schedule(() => {}, releaseAt); // keep transport alive
+      setTimeout(() => {
+        try { v.env.triggerRelease(); } catch (_) {}
+        const cleanupDelay = (this.params.env.release + 0.2) * 1000;
+        setTimeout(() => {
+          try { v.osc1.stop(); v.osc1.dispose(); } catch (_) {}
+          try { v.osc2?.stop(); v.osc2?.dispose(); } catch (_) {}
+          try { v.env.dispose(); } catch (_) {}
+          try { v.osc1Gain.dispose(); } catch (_) {}
+          try { v.osc2Gain?.dispose(); } catch (_) {}
+          try { v.voiceOut.dispose(); } catch (_) {}
+        }, cleanupDelay);
+      }, duration * 1000);
+    });
+  }
+
   _createVoice(note, detuneOffset) {
     const freq = Tone.Frequency(note).toFrequency();
-    const { osc1, osc2, env: envParams } = this.params;
+    const { osc1, osc2, env: ep } = this.params;
 
     const voiceOut = new Tone.Gain(1).connect(this.voiceBus);
+    const envelope = new Tone.AmplitudeEnvelope({ attack: ep.attack, decay: ep.decay, sustain: ep.sustain, release: ep.release }).connect(voiceOut);
 
-    // Envelope
-    const envelope = new Tone.AmplitudeEnvelope({
-      attack: envParams.attack,
-      decay: envParams.decay,
-      sustain: envParams.sustain,
-      release: envParams.release,
-    }).connect(voiceOut);
-
-    // OSC1
+    // OSC 1
     const osc1Gain = new Tone.Gain(osc1.volume).connect(envelope);
     const oscillator1 = new Tone.Oscillator({
       type: osc1.type,
       frequency: freq * Math.pow(2, osc1.octave),
       detune: osc1.detune + detuneOffset,
     }).connect(osc1Gain);
-
-    // LFO pitch connection
-    if (this.params.lfo.destination === 'pitch') {
-      const pitchLfo = new Tone.LFO({
-        type: this.params.lfo.type,
-        frequency: this.params.lfo.rate,
-        min: -this.params.lfo.depth * 100,
-        max: this.params.lfo.depth * 100,
-      }).start().connect(oscillator1.detune);
-      // store for cleanup
-      oscillator1._pitchLfo = pitchLfo;
-    }
-
     oscillator1.start();
 
-    // OSC2
-    let oscillator2 = null;
-    let osc2Gain = null;
+    // OSC 2
+    let oscillator2 = null, osc2Gain = null;
     if (osc2.enabled) {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       const osc2Freq = freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12);
@@ -186,60 +149,61 @@ export class SynthEngine {
     }
 
     envelope.triggerAttack();
-
-    return { osc1: oscillator1, osc2: oscillator2, env: envelope, osc1Gain, osc2Gain };
+    return { osc1: oscillator1, osc2: oscillator2, env: envelope, osc1Gain, osc2Gain, voiceOut };
   }
 
-  allNotesOff() {
-    this.voices.forEach((_, note) => this.noteOff(note));
+  // ─── LFO ────────────────────────────────────────────────────────
+  _connectLFO() {
+    // Disconnect from previous target
+    if (this._lfoTarget) {
+      try { this.lfo.disconnect(this._lfoTarget); } catch (_) {}
+      this._lfoTarget = null;
+    }
+    const { destination, depth } = this.params.lfo;
+    if (depth === 0) return;
+
+    if (destination === 'filter') {
+      const base = this.params.filter.frequency;
+      this.lfo.min = Math.max(20, base * (1 - depth));
+      this.lfo.max = Math.min(20000, base * (1 + depth));
+      this._lfoTarget = this.filter.frequency;
+      this.lfo.connect(this.filter.frequency);
+    } else if (destination === 'amp') {
+      this.lfo.min = Math.max(0, 1 - depth);
+      this.lfo.max = 1;
+      this._lfoTarget = this.masterGain.gain;
+      this.lfo.connect(this.masterGain.gain);
+    }
+    // 'pitch' is handled per-voice (skip global connection)
   }
 
-  // ─── Parameter Setters ────────────────────────────────────────────
+  // ─── Parameter Setters ───────────────────────────────────────────
   setOsc1(key, value) {
     this.params.osc1[key] = value;
-    if (key === 'volume') {
-      this.voices.forEach((voiceList) =>
-        voiceList.forEach((v) => v.osc1Gain?.gain.rampTo(value, 0.05))
-      );
-    }
-    if (key === 'type') {
-      this.voices.forEach((voiceList) =>
-        voiceList.forEach((v) => { try { v.osc1.type = value; } catch (_) {} })
-      );
-    }
+    if (key === 'volume') this.voices.forEach(vl => vl.forEach(v => v.osc1Gain?.gain.rampTo(value, 0.05)));
+    if (key === 'type')   this.voices.forEach(vl => vl.forEach(v => { try { v.osc1.type = value; } catch(_){} }));
   }
 
   setOsc2(key, value) {
     this.params.osc2[key] = value;
-    if (key === 'volume') {
-      this.voices.forEach((voiceList) =>
-        voiceList.forEach((v) => v.osc2Gain?.gain.rampTo(value, 0.05))
-      );
-    }
-    if (key === 'type') {
-      this.voices.forEach((voiceList) =>
-        voiceList.forEach((v) => { try { if (v.osc2) v.osc2.type = value; } catch (_) {} })
-      );
-    }
+    if (key === 'volume') this.voices.forEach(vl => vl.forEach(v => v.osc2Gain?.gain.rampTo(value, 0.05)));
+    if (key === 'type')   this.voices.forEach(vl => vl.forEach(v => { try { if(v.osc2) v.osc2.type = value; } catch(_){} }));
   }
 
   setFilter(key, value) {
     this.params.filter[key] = value;
-    if (key === 'frequency') this.filter.frequency.rampTo(value, 0.05);
-    else if (key === 'Q') this.filter.Q.rampTo(value, 0.05);
+    if (key === 'frequency') { this.filter.frequency.rampTo(value, 0.05); this._connectLFO(); }
+    else if (key === 'Q')    this.filter.Q.rampTo(value, 0.05);
     else if (key === 'type') this.filter.type = value;
-    if (key === 'frequency') this._connectLFO();
   }
 
-  setEnv(key, value) {
-    this.params.env[key] = value;
-  }
+  setEnv(key, value) { this.params.env[key] = value; }
 
   setLFO(key, value) {
     this.params.lfo[key] = value;
-    if (key === 'rate') this.lfo.frequency.rampTo(value, 0.05);
-    if (key === 'depth' || key === 'destination') this._connectLFO();
-    if (key === 'type') this.lfo.type = value;
+    if (key === 'rate')  this.lfo.frequency.rampTo(value, 0.05);
+    if (key === 'type')  this.lfo.type = value;
+    this._connectLFO();
   }
 
   setEffect(effect, key, value) {
@@ -248,13 +212,13 @@ export class SynthEngine {
     if (!node) return;
     if (key === 'wet') node.wet.rampTo(value, 0.05);
     else if (effect === 'chorus') {
-      if (key === 'rate') node.frequency.rampTo(value, 0.05);
+      if (key === 'rate')  node.frequency.rampTo(value, 0.05);
       if (key === 'depth') node.depth = value;
     } else if (effect === 'delay') {
-      if (key === 'time') node.delayTime.rampTo(Tone.Time(value).toSeconds(), 0.05);
+      if (key === 'time')     node.delayTime.rampTo(value, 0.1);
       if (key === 'feedback') node.feedback.rampTo(value, 0.05);
     } else if (effect === 'reverb') {
-      if (key === 'decay') node.decay = value;
+      if (key === 'decay') { node.decay = value; node.generate(); }
     }
   }
 
@@ -263,24 +227,18 @@ export class SynthEngine {
     this.masterGain.gain.rampTo(value, 0.05);
   }
 
-  setUnison(key, value) {
-    this.params.unison[key] = value;
-  }
+  setUnison(key, value) { this.params.unison[key] = value; }
 
   loadPreset(preset) {
     this.allNotesOff();
-    this.params = { ...this._defaultParams(), ...preset };
-
+    this.params = JSON.parse(JSON.stringify(preset));
     this.filter.type = this.params.filter.type;
     this.filter.frequency.rampTo(this.params.filter.frequency, 0.05);
     this.filter.Q.rampTo(this.params.filter.Q, 0.05);
-
     this.masterGain.gain.rampTo(this.params.amp.volume, 0.05);
-
     this.lfo.type = this.params.lfo.type;
     this.lfo.frequency.rampTo(this.params.lfo.rate, 0.05);
     this._connectLFO();
-
     this.chorus.wet.rampTo(this.params.effects.chorus.wet, 0.05);
     this.delay.wet.rampTo(this.params.effects.delay.wet, 0.05);
     this.reverb.wet.rampTo(this.params.effects.reverb.wet, 0.05);
@@ -288,11 +246,12 @@ export class SynthEngine {
 
   dispose() {
     this.allNotesOff();
-    this.lfo.dispose();
-    this.filter.dispose();
-    this.chorus.dispose();
-    this.delay.dispose();
-    this.reverb.dispose();
-    this.masterGain.dispose();
+    try { this.lfo.dispose(); } catch(_) {}
+    try { this.filter.dispose(); } catch(_) {}
+    try { this.chorus.dispose(); } catch(_) {}
+    try { this.delay.dispose(); } catch(_) {}
+    try { this.reverb.dispose(); } catch(_) {}
+    try { this.voiceBus.dispose(); } catch(_) {}
+    try { this.masterGain.dispose(); } catch(_) {}
   }
 }
