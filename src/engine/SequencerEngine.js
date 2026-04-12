@@ -37,7 +37,8 @@ export class SequencerEngine {
     this.stepLength = '16n';
     this.currentStep = 0;
     this.playing = false;
-    this.onStep = null; // callback(stepIndex)
+    this._stepData = null;
+    this.onStep = null;
 
     Tone.getTransport().bpm.value = this.bpm;
 
@@ -61,9 +62,11 @@ export class SequencerEngine {
 
   setStepCallback(cb) { this.onStep = cb; }
 
-  async start(stepData) {
+  // stepData is set externally via updateStepData before calling start().
+  // This avoids race conditions when callers update stepData right after
+  // calling setStepCount() or loadPreset().
+  async start() {
     await Tone.start();
-    this._stepData = stepData;
     this._sequence.callback = (time, step) => this._tick(time, step);
     this._sequence.start(0);
     Tone.getTransport().start();
@@ -88,9 +91,10 @@ export class SequencerEngine {
     Tone.getTransport().bpm.rampTo(bpm, 0.1);
   }
 
+  // Rebuilds the sequence for a new step count.
+  // Stops if currently playing. Does NOT auto-restart — caller handles restart.
   setStepCount(count) {
-    const wasPlaying = this.playing;
-    if (wasPlaying) this.stop();
+    if (this.playing) this.stop();
     this.steps = count;
     this._sequence.dispose();
     this._sequence = new Tone.Sequence(
@@ -98,7 +102,6 @@ export class SequencerEngine {
       Array.from({ length: count }, (_, i) => i),
       this.stepLength
     );
-    if (wasPlaying) this.start(this._stepData);
   }
 
   dispose() {

@@ -21,7 +21,7 @@ export class SynthEngine {
       effects: {
         chorus: { rate: 1.5, depth: 0.5, wet: 0, enabled: false },
         delay:  { time: 0.25, feedback: 0.3, wet: 0, enabled: false },
-        reverb: { decay: 2.5, wet: 0, enabled: false },
+        reverb: { decay: 2.5, wet: 0, tone: 20000, enabled: false },
       },
       amp: { volume: 0.75 },
     };
@@ -35,9 +35,13 @@ export class SynthEngine {
     this.delay  = new Tone.FeedbackDelay({ delayTime: this.params.effects.delay.time, feedback: this.params.effects.delay.feedback, wet: 0 });
     this.chorus = new Tone.Chorus({ rate: this.params.effects.chorus.rate, depth: this.params.effects.chorus.depth, wet: 0 }).start();
 
+    // reverbTone: post-reverb brightness filter (lowpass, default fully open)
+    this.reverbTone = new Tone.Filter({ type: 'lowpass', frequency: 20000 });
+    this.reverbTone.connect(this.masterGain);
+
     this.chorus.connect(this.delay);
     this.delay.connect(this.reverb);
-    this.reverb.connect(this.masterGain);
+    this.reverb.connect(this.reverbTone);
 
     this.filter = new Tone.Filter({
       type:    this.params.filter.type,
@@ -245,6 +249,7 @@ export class SynthEngine {
       if (key === 'feedback') node.feedback.rampTo(value, 0.05);
     } else if (effect === 'reverb') {
       if (key === 'decay') { node.decay = value; node.generate(); }
+      if (key === 'tone')  this.reverbTone.frequency.rampTo(value, 0.05);
     }
   }
 
@@ -269,16 +274,18 @@ export class SynthEngine {
     this.chorus.wet.rampTo(this.params.effects.chorus.enabled ? this.params.effects.chorus.wet : 0, 0.05);
     this.delay.wet.rampTo(this.params.effects.delay.enabled   ? this.params.effects.delay.wet   : 0, 0.05);
     this.reverb.wet.rampTo(this.params.effects.reverb.enabled ? this.params.effects.reverb.wet  : 0, 0.05);
+    this.reverbTone.frequency.rampTo(this.params.effects.reverb.tone ?? 20000, 0.05);
   }
 
   dispose() {
     this.allNotesOff();
-    try { this.lfo.dispose(); }       catch(_) {}
-    try { this.filter.dispose(); }    catch(_) {}
-    try { this.chorus.dispose(); }    catch(_) {}
-    try { this.delay.dispose(); }     catch(_) {}
-    try { this.reverb.dispose(); }    catch(_) {}
-    try { this.voiceBus.dispose(); }  catch(_) {}
-    try { this.masterGain.dispose(); } catch(_) {}
+    try { this.lfo.dispose(); }          catch(_) {}
+    try { this.filter.dispose(); }       catch(_) {}
+    try { this.chorus.dispose(); }       catch(_) {}
+    try { this.delay.dispose(); }        catch(_) {}
+    try { this.reverb.dispose(); }       catch(_) {}
+    try { this.reverbTone.dispose(); }   catch(_) {}
+    try { this.voiceBus.dispose(); }     catch(_) {}
+    try { this.masterGain.dispose(); }   catch(_) {}
   }
 }

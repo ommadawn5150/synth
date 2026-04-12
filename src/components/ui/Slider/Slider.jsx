@@ -1,8 +1,24 @@
 import './Slider.css';
 
-export function Slider({ label, value, min, max, step = 0.001, onChange, decimals = 2, unit = '' }) {
-  const norm = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  const display = typeof decimals === 'number' ? Number(value).toFixed(decimals) : value;
+export function Slider({ label, value, min, max, step = 0.001, onChange, decimals = 2, unit = '', log = false, formatValue }) {
+  // For log scale, slider mechanics operate in natural-log space
+  const logMin = log ? Math.log(min) : min;
+  const logMax = log ? Math.log(max) : max;
+  const logVal = log ? Math.log(Math.max(min, value)) : value;
+
+  const norm = Math.max(0, Math.min(1, (logVal - logMin) / (logMax - logMin)));
+
+  let display;
+  if (formatValue) {
+    display = formatValue(value);
+  } else {
+    display = typeof decimals === 'number' ? Number(value).toFixed(decimals) : value;
+  }
+
+  function handleChange(e) {
+    const raw = Number(e.target.value);
+    onChange(log ? Math.exp(raw) : raw);
+  }
 
   return (
     <div className="slider-wrapper">
@@ -13,11 +29,11 @@ export function Slider({ label, value, min, max, step = 0.001, onChange, decimal
       <input
         type="range"
         className="slider-input"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
+        min={log ? logMin : min}
+        max={log ? logMax : max}
+        step={log ? (logMax - logMin) / 1000 : step}
+        value={logVal}
+        onChange={handleChange}
         style={{ '--fill': `${norm * 100}%` }}
       />
     </div>
