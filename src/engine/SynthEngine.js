@@ -157,7 +157,15 @@ export class SynthEngine {
 
   // ─── LFO ─────────────────────────────────────────────────────────
   _connectLFO() {
-    // Disconnect from ALL previous targets first (safe, avoids stale connections)
+    // Restore modulated parameters to base values before disconnecting.
+    // Without this, the filter/amp gets frozen at whatever value the LFO
+    // was at when disconnected, causing silence if LFO was at extreme low.
+    if (this._lfoTarget === this.filter.frequency) {
+      this.filter.frequency.rampTo(this.params.filter.frequency, 0.05);
+    } else if (this._lfoTarget === this.masterGain.gain) {
+      this.masterGain.gain.rampTo(this.params.amp.volume, 0.05);
+    }
+
     try { this.lfo.disconnect(); } catch (_) {}
     this._lfoTarget = null;
 
