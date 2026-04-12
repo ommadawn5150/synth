@@ -2,7 +2,6 @@
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 0;
 }
 
 .osc-panel, .unison-panel {
@@ -10,7 +9,13 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  min-width: 0;
+  min-width: 140px;
+}
+
+.osc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .osc-content {
@@ -25,14 +30,7 @@
   pointer-events: none;
 }
 
-.osc-knobs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .osc2-toggle {
-  align-self: flex-start;
   background: var(--bg-section);
   border: 1px solid var(--border);
   border-radius: 3px;
