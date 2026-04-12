@@ -1,13 +1,34 @@
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { SynthEngine } from '../engine/SynthEngine';
 import { SequencerEngine, buildScaleNotes, SCALES, ROOTS, defaultStep } from '../engine/SequencerEngine';
 import { PRESETS } from '../presets/presets';
 
 const SynthContext = createContext(null);
 
+// Default sequencer state has a simple audible pattern so the play button
+// produces sound immediately, without needing to load a preset first.
+const INIT_PATTERN = [
+  { active: true,  note: 'C4', velocity: 0.8 },
+  { active: false, note: 'C4', velocity: 0.8 },
+  { active: true,  note: 'E4', velocity: 0.8 },
+  { active: false, note: 'E4', velocity: 0.8 },
+  { active: true,  note: 'G4', velocity: 0.8 },
+  { active: false, note: 'G4', velocity: 0.8 },
+  { active: true,  note: 'E4', velocity: 0.8 },
+  { active: false, note: 'E4', velocity: 0.8 },
+  { active: true,  note: 'C4', velocity: 0.8 },
+  { active: false, note: 'C4', velocity: 0.8 },
+  { active: true,  note: 'G4', velocity: 0.8 },
+  { active: false, note: 'G4', velocity: 0.8 },
+  { active: true,  note: 'A4', velocity: 0.8 },
+  { active: false, note: 'A4', velocity: 0.8 },
+  { active: true,  note: 'G4', velocity: 0.8 },
+  { active: false, note: 'G4', velocity: 0.8 },
+];
+
 const DEFAULT_SEQ = {
   bpm: 120,
-  steps: Array.from({ length: 16 }, (_, i) => defaultStep(i % 4 === 0 ? 'C4' : 'E4')),
+  steps: INIT_PATTERN,
   root: 'C',
   scale: 'minor',
   stepCount: 16,
@@ -36,6 +57,9 @@ export function SynthProvider({ children }) {
     const seqEngine = new SequencerEngine(engine);
     seqEngineRef.current = seqEngine;
 
+    // Sync initial step data to engine
+    seqEngine.updateStepData(DEFAULT_SEQ.steps);
+
     seqEngine.setStepCallback((step) => {
       setSeq(prev => ({ ...prev, currentStep: step }));
     });
@@ -50,7 +74,7 @@ export function SynthProvider({ children }) {
     setParams(prev => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
     const engine = engineRef.current;
     if (!engine) return;
-    if (section === 'osc1')   engine.setOsc1(key, value);
+    if (section === 'osc1')        engine.setOsc1(key, value);
     else if (section === 'osc2')   engine.setOsc2(key, value);
     else if (section === 'filter') engine.setFilter(key, value);
     else if (section === 'env')    engine.setEnv(key, value);
@@ -88,15 +112,18 @@ export function SynthProvider({ children }) {
     localStorage.setItem('synth_presets', JSON.stringify(updated));
   }
 
-  function noteOn(note)  { engineRef.current?.noteOn(note); }   // sync — AudioContext unlocked in App.jsx
+  function noteOn(note)  { engineRef.current?.noteOn(note); }
   function noteOff(note) { engineRef.current?.noteOff(note); }
 
   // ── Sequencer ────────────────────────────────────────────────────
   function seqPlay() {
     const se = seqEngineRef.current;
-    if (!se) return;
+    // Guard: don't double-start. Use engine's playing flag (sync) not React state.
+    if (!se || se.playing) return;
     se.setBPM(seq.bpm);
-    se.start(seq.steps).then(() => setSeq(prev => ({ ...prev, playing: true })));
+    // Always sync latest React steps to engine before starting
+    se.updateStepData(seq.steps);
+    se.start().then(() => setSeq(prev => ({ ...prev, playing: true })));
   }
 
   function seqStop() {
@@ -105,7 +132,10 @@ export function SynthProvider({ children }) {
   }
 
   function seqToggle() {
-    if (seq.playing) seqStop(); else seqPlay();
+    const se = seqEngineRef.current;
+    if (!se) return;
+    // Use engine's playing flag as source of truth to avoid stale React state
+    if (se.playing) seqStop(); else seqPlay();
   }
 
   function setSeqBPM(bpm) {
@@ -122,11 +152,23 @@ export function SynthProvider({ children }) {
   }
 
   function setSeqStepCount(count) {
+    const se = seqEngineRef.current;
+    const wasPlaying = se?.playing ?? false;
+
     setSeq(prev => {
       const steps = Array.from({ length: count }, (_, i) => prev.steps[i] ?? defaultStep());
+      // Update engine step data inside updater so it's computed from prev state
+      se?.updateStepData(steps);
       return { ...prev, stepCount: count, steps };
     });
-    seqEngineRef.current?.setStepCount(count);
+
+    // setStepCount stops if playing and rebuilds the sequence
+    se?.setStepCount(count);
+
+    // Restart playback with the new sequence if it was playing
+    if (wasPlaying) {
+      se?.start().then(() => setSeq(prev => ({ ...prev, playing: true })));
+    }
   }
 
   function setSeqScale(root, scale) {
@@ -149,11 +191,28 @@ export function SynthProvider({ children }) {
   }
 
   function loadSeqPreset(preset) {
+    const se = seqEngineRef.current;
     const steps = Array.from({ length: preset.stepCount }, (_, i) => preset.steps[i] ?? defaultStep());
-    setSeq(prev => ({ ...prev, bpm: preset.bpm, stepCount: preset.stepCount, steps, root: preset.root, scale: preset.scale }));
-    seqEngineRef.current?.setBPM(preset.bpm);
-    seqEngineRef.current?.setStepCount(preset.stepCount);
-    seqEngineRef.current?.updateStepData(steps);
+
+    // Stop playback first to avoid race with setStepCount's internal stop
+    if (se?.playing) se.stop();
+
+    se?.setBPM(preset.bpm);
+    // setStepCount rebuilds the sequence; does NOT auto-restart
+    se?.setStepCount(preset.stepCount);
+    // updateStepData sets the correct steps AFTER the sequence is rebuilt
+    se?.updateStepData(steps);
+
+    setSeq(prev => ({
+      ...prev,
+      bpm: preset.bpm,
+      stepCount: preset.stepCount,
+      steps,
+      root: preset.root,
+      scale: preset.scale,
+      playing: false,
+      currentStep: -1,
+    }));
   }
 
   function deleteSeqPreset(id) {

@@ -5,7 +5,7 @@ const defaults = {
   effects: {
     chorus: { enabled: false },
     delay:  { enabled: false },
-    reverb: { enabled: false },
+    reverb: { enabled: false, tone: 20000 },
   },
 };
 
