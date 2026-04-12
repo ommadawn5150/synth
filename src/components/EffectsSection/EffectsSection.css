@@ -1,14 +1,15 @@
 .effects-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 12px 14px;
+  min-width: 160px;
 }
 
 .effect-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .effect-title {
@@ -19,10 +20,4 @@
   color: var(--text-dim);
   border-bottom: 1px solid var(--border);
   padding-bottom: 3px;
-}
-
-.effect-knobs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
