@@ -5,6 +5,7 @@ const UNISON_SPREADS = { 1:[0], 2:[-10,10], 3:[-15,0,15], 4:[-20,-7,7,20], 7:[-3
 export class SynthEngine {
   constructor() {
     this.voices = new Map();
+    this._pendingNotes = new Set(); // notes awaiting AudioContext unlock
     this.params = this._defaultParams();
     this._lfoTarget = null;
     this._started = false;
@@ -63,7 +64,14 @@ export class SynthEngine {
 
   // ─── Note On/Off ────────────────────────────────────────────────
   async noteOn(note) {
+    // Track pending so a quick noteOff before AudioContext unlocks cancels the note
+    this._pendingNotes.add(note);
     await this._ensureStarted();
+
+    // noteOff may have been called while we were awaiting — bail out
+    if (!this._pendingNotes.has(note)) return;
+    this._pendingNotes.delete(note);
+
     if (this.voices.has(note)) this.noteOff(note);
 
     const spreads = UNISON_SPREADS[this.params.unison.voices] || [0];
@@ -73,6 +81,7 @@ export class SynthEngine {
   }
 
   noteOff(note) {
+    this._pendingNotes.delete(note); // cancel if still awaiting
     const voiceList = this.voices.get(note);
     if (!voiceList) return;
     const releaseTime = (this.params.env.release + 0.1) * 1000;
