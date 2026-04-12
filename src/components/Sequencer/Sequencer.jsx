@@ -10,7 +10,7 @@ export function Sequencer() {
   const {
     seq, scaleNotes,
     seqToggle, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
-    seqPresets, saveSeqPreset, loadSeqPreset, deleteSeqPreset,
+    seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
   } = useSynth();
 
   const [notePickerIdx, setNotePickerIdx] = useState(null);
@@ -177,11 +177,17 @@ export function Sequencer() {
         <div className="seq-preset-list">
           {seqPresets.map(p => (
             <span key={p.id} className="seq-preset-item">
-              <button className="seq-preset-btn" onClick={() => loadSeqPreset(p)}>{p.name}</button>
+              <button
+                className={`seq-preset-btn ${p.id === currentSeqPresetId ? 'active' : ''}`}
+                onClick={() => loadSeqPreset(p)}
+              >{p.name}</button>
               <button className="seq-preset-del" onClick={() => deleteSeqPreset(p.id)}>×</button>
             </span>
           ))}
         </div>
+        {currentSeqPresetId && (
+          <button className="seq-count-btn seq-overwrite-btn" onClick={overwriteSeqPreset}>↺</button>
+        )}
         {showSaveInput ? (
           <form className="seq-save-form" onSubmit={handleSave}>
             <input

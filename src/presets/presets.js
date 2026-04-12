@@ -2,7 +2,7 @@ const defaults = {
   osc1:   { enabled: true },
   osc3:   { type: 'white', volume: 0, enabled: false },
   filter: { rolloff: -24, enabled: true },
-  lfo:    { enabled: true },
+  lfo:    { enabled: true, polarity: '±' },
   effects: {
     chorus: { enabled: false },
     delay:  { enabled: false },

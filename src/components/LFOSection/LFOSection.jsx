@@ -17,6 +17,12 @@ const DESTS = [
   { value: 'amp',    label: 'Amp'    },
 ];
 
+const POLARITIES = [
+  { value: '+',  label: '+' },
+  { value: '±',  label: '±' },
+  { value: '-',  label: '−' },
+];
+
 export function LFOSection() {
   const { params, updateParam } = useSynth();
   const lfo = params.lfo;
@@ -32,6 +38,8 @@ export function LFOSection() {
           onChange={v => updateParam('lfo', 'type', v)} />
         <Selector label="Dest" options={DESTS} value={lfo.destination}
           onChange={v => updateParam('lfo', 'destination', v)} />
+        <Selector label="Pol" options={POLARITIES} value={lfo.polarity ?? '±'}
+          onChange={v => updateParam('lfo', 'polarity', v)} />
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Slider label="Rate"  value={lfo.rate}  min={0.01} max={20} step={0.01} decimals={2} unit=" Hz" onChange={v => updateParam('lfo', 'rate',  v)} />
           <Slider label="Depth" value={lfo.depth} min={0}    max={1}  step={0.01} decimals={2}            onChange={v => updateParam('lfo', 'depth', v)} />

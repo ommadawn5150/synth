@@ -50,6 +50,7 @@ export function SynthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('synth_seq_presets') || '[]'); }
     catch { return []; }
   });
+  const [currentSeqPresetId, setCurrentSeqPresetId] = useState(null);
 
   useEffect(() => {
     const engine = new SynthEngine();
@@ -188,6 +189,24 @@ export function SynthProvider({ children }) {
     };
     const updated = [...seqPresets.filter(p => p.name !== name), preset];
     setSeqPresets(updated);
+    setCurrentSeqPresetId(preset.id);
+    localStorage.setItem('synth_seq_presets', JSON.stringify(updated));
+  }
+
+  function overwriteSeqPreset() {
+    if (!currentSeqPresetId) return;
+    const existing = seqPresets.find(p => p.id === currentSeqPresetId);
+    if (!existing) return;
+    const preset = {
+      ...existing,
+      bpm: seq.bpm,
+      stepCount: seq.stepCount,
+      steps: JSON.parse(JSON.stringify(seq.steps)),
+      root: seq.root,
+      scale: seq.scale,
+    };
+    const updated = seqPresets.map(p => p.id === currentSeqPresetId ? preset : p);
+    setSeqPresets(updated);
     localStorage.setItem('synth_seq_presets', JSON.stringify(updated));
   }
 
@@ -204,6 +223,7 @@ export function SynthProvider({ children }) {
     // updateStepData sets the correct steps AFTER the sequence is rebuilt
     se?.updateStepData(steps);
 
+    setCurrentSeqPresetId(preset.id);
     setSeq(prev => ({
       ...prev,
       bpm: preset.bpm,
@@ -219,6 +239,7 @@ export function SynthProvider({ children }) {
   function deleteSeqPreset(id) {
     const updated = seqPresets.filter(p => p.id !== id);
     setSeqPresets(updated);
+    if (id === currentSeqPresetId) setCurrentSeqPresetId(null);
     localStorage.setItem('synth_seq_presets', JSON.stringify(updated));
   }
 
@@ -231,7 +252,7 @@ export function SynthProvider({ children }) {
       noteOn, noteOff,
       seq, scaleNotes,
       seqToggle, seqStop, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
-      seqPresets, saveSeqPreset, loadSeqPreset, deleteSeqPreset,
+      seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
     }}>
       {children}
     </SynthContext.Provider>

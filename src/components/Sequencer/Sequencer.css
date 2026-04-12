@@ -227,7 +227,10 @@
   cursor: pointer;
   transition: background 0.08s, color 0.08s;
 }
-.seq-preset-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.seq-preset-btn:hover  { background: var(--accent); color: #fff; border-color: var(--accent); }
+.seq-preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.seq-overwrite-btn { font-size: 13px; padding: 2px 7px; }
 
 .seq-preset-del {
   background: var(--bg-section);

@@ -68,6 +68,8 @@ export class SequencerEngine {
   async start() {
     await Tone.start();
     this._sequence.callback = (time, step) => this._tick(time, step);
+    // Always stop then re-schedule so restart after stop works correctly
+    try { this._sequence.stop(); } catch(_) {}
     this._sequence.start(0);
     Tone.getTransport().start();
     this.playing = true;

@@ -186,24 +186,29 @@ export class SynthEngine {
     try { this.lfo.disconnect(); } catch (_) {}
     this._lfoTarget = null;
 
-    const { destination, depth, enabled } = this.params.lfo;
+    const { destination, depth, enabled, polarity = '±' } = this.params.lfo;
     if (!enabled || depth === 0) return;
 
     if (destination === 'filter') {
       const base = this.params.filter.frequency;
-      this.lfo.min = Math.max(20, base * (1 - depth));
-      this.lfo.max = Math.min(20000, base * (1 + depth));
+      const lo = Math.max(20, base * (1 - depth));
+      const hi = Math.min(20000, base * (1 + depth));
+      this.lfo.min = polarity === '+' ? base : lo;
+      this.lfo.max = polarity === '-' ? base : hi;
       this._lfoTarget = this.filter.frequency;
       this.lfo.connect(this.filter.frequency);
     } else if (destination === 'amp') {
-      this.lfo.min = Math.max(0, 1 - depth);
-      this.lfo.max = 1;
+      const vol = this.params.amp.volume;
+      const lo = Math.max(0, vol - depth);
+      const hi = Math.min(1, vol + depth);
+      this.lfo.min = polarity === '+' ? vol : lo;
+      this.lfo.max = polarity === '-' ? vol : hi;
       this._lfoTarget = this.masterGain.gain;
       this.lfo.connect(this.masterGain.gain);
     } else if (destination === 'pitch') {
       const depthCents = depth * 200;
-      this.lfo.min = -depthCents;
-      this.lfo.max = depthCents;
+      this.lfo.min = polarity === '+' ? 0 : -depthCents;
+      this.lfo.max = polarity === '-' ? 0 : depthCents;
       this._lfoTarget = 'pitch';
       this.voices.forEach(voiceList => {
         voiceList.forEach(v => {
