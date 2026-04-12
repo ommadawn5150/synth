@@ -92,6 +92,23 @@
   margin-bottom: 2px;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
 .section-divider {
   width: 1px;
   background: var(--border);

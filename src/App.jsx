@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as Tone from 'tone';
 import { SynthProvider } from './contexts/SynthContext';
 import { Header } from './components/Header/Header';
 import { OscSection } from './components/OscSection/OscSection';
@@ -29,6 +30,17 @@ function SynthApp() {
     applyTheme(theme);
     localStorage.setItem('synth_theme', theme);
   }, [theme]);
+
+  // Unlock AudioContext on first user interaction so noteOn can be synchronous
+  useEffect(() => {
+    const unlock = () => { Tone.start(); };
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('keydown',     unlock, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('keydown',     unlock);
+    };
+  }, []);
 
   return (
     <div className="app">

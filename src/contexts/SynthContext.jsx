@@ -84,7 +84,7 @@ export function SynthProvider({ children }) {
     localStorage.setItem('synth_presets', JSON.stringify(updated));
   }
 
-  function noteOn(note)  { engineRef.current?.noteOn(note); }
+  function noteOn(note)  { engineRef.current?.noteOn(note); }   // sync — AudioContext unlocked in App.jsx
   function noteOff(note) { engineRef.current?.noteOff(note); }
 
   // ── Sequencer ────────────────────────────────────────────────────
