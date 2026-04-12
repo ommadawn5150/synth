@@ -5,3 +5,14 @@
   padding: 12px 14px;
   min-width: 160px;
 }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}

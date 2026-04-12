@@ -1,5 +1,6 @@
 import { Slider } from '../ui/Slider/Slider';
 import { Selector } from '../ui/Selector/Selector';
+import { Toggle } from '../ui/Toggle/Toggle';
 import { useSynth } from '../../contexts/SynthContext';
 import './OscSection.css';
 
@@ -24,19 +25,11 @@ function OscPanel({ label, oscKey }) {
 
   return (
     <div className="osc-panel">
-      <div className="osc-panel-header">
+      <div className="section-header">
         <div className="section-title">{label}</div>
-        {oscKey === 'osc2' && (
-          <button
-            className={`osc2-toggle ${osc.enabled ? 'active' : ''}`}
-            onClick={() => updateParam(oscKey, 'enabled', !osc.enabled)}
-          >
-            {osc.enabled ? 'ON' : 'OFF'}
-          </button>
-        )}
+        <Toggle value={osc.enabled} onChange={v => updateParam(oscKey, 'enabled', v)} />
       </div>
-
-      <div className={`osc-content ${oscKey === 'osc2' && !osc.enabled ? 'disabled' : ''}`}>
+      <div className={`osc-content ${!osc.enabled ? 'disabled' : ''}`}>
         <Selector label="Wave" options={WAVEFORMS} value={osc.type}
           onChange={v => updateParam(oscKey, 'type', v)} />
         <Selector label="Oct" options={OCTAVES} value={osc.octave}
@@ -64,7 +57,6 @@ export function OscSection() {
       <div className="section-divider" />
       <OscPanel label="OSC 2" oscKey="osc2" />
       <div className="section-divider" />
-
       <div className="unison-panel">
         <div className="section-title">Unison</div>
         <Selector
