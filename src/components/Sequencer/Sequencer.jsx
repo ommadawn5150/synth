@@ -13,6 +13,7 @@ export function Sequencer() {
     seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
   } = useSynth();
 
+  const [collapsed, setCollapsed] = useState(false);
   const [notePickerIdx, setNotePickerIdx] = useState(null);
   const [saveName, setSaveName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -80,7 +81,7 @@ export function Sequencer() {
   }
 
   return (
-    <div className="sequencer synth-section">
+    <div className={`sequencer synth-section ${collapsed ? 'seq-collapsed' : ''}`}>
       {/* Transport controls */}
       <div className="seq-controls">
         <button
@@ -90,42 +91,52 @@ export function Sequencer() {
           {seq.playing ? '■' : '▶'}
         </button>
 
-        <div className="seq-bpm">
-          <span className="seq-label">BPM</span>
-          <input
-            type="range" min={40} max={240} value={seq.bpm}
-            onChange={e => setSeqBPM(Number(e.target.value))}
-            className="seq-slider"
-          />
-          <span className="seq-bpm-val">{seq.bpm}</span>
-        </div>
+        {!collapsed && <>
+          <div className="seq-bpm">
+            <span className="seq-label">BPM</span>
+            <input
+              type="range" min={40} max={240} value={seq.bpm}
+              onChange={e => setSeqBPM(Number(e.target.value))}
+              className="seq-slider"
+            />
+            <span className="seq-bpm-val">{seq.bpm}</span>
+          </div>
 
-        <div className="seq-steps-control">
-          <span className="seq-label">Steps</span>
-          {STEP_COUNTS.map(n => (
-            <button key={n}
-              className={`seq-count-btn ${seq.stepCount === n ? 'active' : ''}`}
-              onClick={() => setSeqStepCount(n)}
-            >{n}</button>
-          ))}
-        </div>
+          <div className="seq-steps-control">
+            <span className="seq-label">Steps</span>
+            {STEP_COUNTS.map(n => (
+              <button key={n}
+                className={`seq-count-btn ${seq.stepCount === n ? 'active' : ''}`}
+                onClick={() => setSeqStepCount(n)}
+              >{n}</button>
+            ))}
+          </div>
 
-        <div className="seq-scale-control">
-          <span className="seq-label">Root</span>
-          <select className="seq-select" value={seq.root}
-            onChange={e => setSeqScale(e.target.value, seq.scale)}>
-            {ROOTS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <span className="seq-label">Scale</span>
-          <select className="seq-select" value={seq.scale}
-            onChange={e => setSeqScale(seq.root, e.target.value)}>
-            {Object.keys(SCALES).map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+          <div className="seq-scale-control">
+            <span className="seq-label">Root</span>
+            <select className="seq-select" value={seq.root}
+              onChange={e => setSeqScale(e.target.value, seq.scale)}>
+              {ROOTS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <span className="seq-label">Scale</span>
+            <select className="seq-select" value={seq.scale}
+              onChange={e => setSeqScale(seq.root, e.target.value)}>
+              {Object.keys(SCALES).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </>}
+
+        <button
+          className="seq-collapse-btn"
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? 'シーケンサーを表示' : 'シーケンサーを非表示'}
+        >
+          {collapsed ? '▲ SEQ' : '▼'}
+        </button>
       </div>
 
       {/* Step grid */}
-      <div className="seq-grid" style={{ '--step-count': seq.stepCount }}>
+      {!collapsed && <div className="seq-grid" style={{ '--step-count': seq.stepCount }}>
         {seq.steps.slice(0, seq.stepCount).map((step, i) => (
           <button
             key={i}
@@ -150,10 +161,10 @@ export function Sequencer() {
             )}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Note picker */}
-      {notePickerIdx !== null && (
+      {!collapsed && notePickerIdx !== null && (
         <div className="note-picker-bar" ref={pickerRef}>
           <span className="note-picker-label">Step {notePickerIdx + 1}</span>
           <div className="note-picker-notes">
@@ -172,7 +183,7 @@ export function Sequencer() {
       )}
 
       {/* Preset bar */}
-      <div className="seq-preset-bar">
+      {!collapsed && <div className="seq-preset-bar">
         <span className="seq-label">PRESETS</span>
         <div className="seq-preset-list">
           {seqPresets.map(p => (
@@ -204,11 +215,11 @@ export function Sequencer() {
         ) : (
           <button className="seq-count-btn" onClick={() => setShowSaveInput(true)}>+ Save</button>
         )}
-      </div>
+      </div>}
 
-      <div className="seq-hint">
+      {!collapsed && <div className="seq-hint">
         Tap: on/off &nbsp;·&nbsp; Long press / ✎ / Right-click: select note
-      </div>
+      </div>}
     </div>
   );
 }

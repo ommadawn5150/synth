@@ -5,6 +5,30 @@
   padding: 12px 14px;
 }
 
+.sequencer.seq-collapsed {
+  padding: 6px 14px;
+}
+
+.seq-collapse-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 3px;
+  transition: color 0.1s, background 0.1s;
+  flex-shrink: 0;
+}
+.seq-collapse-btn:hover {
+  color: var(--accent);
+  background: var(--bg-section);
+}
+
 /* ── Controls ────────────────────────────────────── */
 .seq-controls {
   display: flex;
