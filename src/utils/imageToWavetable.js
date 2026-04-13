@@ -45,7 +45,8 @@ function computePartials(data) {
  * Load an image, extract NUM_FRAMES rows (top→bottom), compute DFT partials
  * per frame, and return:
  *   frames          – array of NUM_FRAMES partials arrays (for wavetable morphing)
- *   waveformSamples – brightness samples of the middle frame (for canvas preview)
+ *   frameSamples    – array of NUM_FRAMES waveform sample arrays (for 3D preview)
+ *   waveformSamples – brightness samples of the middle frame (compat alias)
  */
 export function imageFileToWavetable(file) {
   return new Promise((resolve, reject) => {
@@ -61,7 +62,7 @@ export function imageFileToWavetable(file) {
       const ctx = canvas.getContext('2d');
 
       const frames = [];
-      let centerSamples = null;
+      const frameSamples = [];
       const midFrame = Math.floor(NUM_FRAMES / 2);
 
       for (let f = 0; f < NUM_FRAMES; f++) {
@@ -72,10 +73,10 @@ export function imageFileToWavetable(file) {
         const { data } = ctx.getImageData(0, 0, SAMPLE_WIDTH, 1);
         const { partials, samples } = computePartials(data);
         frames.push(partials);
-        if (f === midFrame) centerSamples = samples;
+        frameSamples.push(samples);
       }
 
-      resolve({ frames, waveformSamples: centerSamples ?? frames[0] });
+      resolve({ frames, frameSamples, waveformSamples: frameSamples[midFrame] });
     };
 
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Slider } from '../ui/Slider/Slider';
 import { Selector } from '../ui/Selector/Selector';
 import { Toggle } from '../ui/Toggle/Toggle';
@@ -27,51 +27,148 @@ const NOISE_TYPES = [
   { value: 'brown', label: 'B' },
 ];
 
-function WaveformCanvas({ samples }) {
-  const canvasRef = useRef(null);
+// ── 3D wavetable canvas ───────────────────────────────────────────────────────
 
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !samples) return;
-    const W = canvas.offsetWidth  || 200;
-    const H = canvas.offsetHeight || 30;
-    canvas.width  = W;
-    canvas.height = H;
+function drawWavetable3D(canvas, frameSamples, pos) {
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  if (!W || !H) return;
+  if (canvas.width !== W) canvas.width = W;
+  if (canvas.height !== H) canvas.height = H;
 
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, W, H);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
 
-    ctx.strokeStyle = 'rgba(255,107,53,0.25)';
-    ctx.lineWidth = 1;
+  const N = frameSamples.length;
+  if (N < 2) return;
+
+  // Perspective offsets per frame step
+  const PX = Math.max(2, Math.floor(W * 0.14 / (N - 1)));
+  const PY = Math.max(2, Math.floor(H * 0.38 / (N - 1)));
+  const padL   = 6;
+  const waveW  = W - (N - 1) * PX - padL - 4;
+  const waveHalf = (H - (N - 1) * PY) / 2 - 5;
+
+  // fi=0 → front/bottom (wtPos=0), fi=N-1 → back/top (wtPos=1)
+  const baseY = H / 2 + ((N - 1) * PY) / 2;
+  const getCoords = (fi) => ({
+    x0: padL + fi * PX,
+    yC: baseY - fi * PY,
+  });
+
+  const curFrac  = pos * (N - 1);
+  const curFrame = Math.max(0, Math.min(N - 1, Math.round(curFrac)));
+
+  // ── Left-edge spine — the depth-axis "縦線" ──────────────────────────────
+  ctx.beginPath();
+  for (let fi = 0; fi < N; fi++) {
+    const { x0, yC } = getCoords(fi);
+    fi === 0 ? ctx.moveTo(x0, yC) : ctx.lineTo(x0, yC);
+  }
+  ctx.strokeStyle = 'rgba(255,107,53,0.22)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ── Frames back → front ───────────────────────────────────────────────────
+  for (let fi = N - 1; fi >= 0; fi--) {
+    const { x0, yC } = getCoords(fi);
+    const samples   = frameSamples[fi];
+    const isCurrent = fi === curFrame;
+
+    // Filled area
     ctx.beginPath();
-    ctx.moveTo(0, H / 2);
-    ctx.lineTo(W, H / 2);
+    ctx.moveTo(x0, yC);
+    for (let i = 0; i < samples.length; i++) {
+      ctx.lineTo(x0 + (i / (samples.length - 1)) * waveW, yC - samples[i] * waveHalf);
+    }
+    ctx.lineTo(x0 + waveW, yC);
+    ctx.closePath();
+    ctx.fillStyle = isCurrent ? 'rgba(255,107,53,0.10)' : 'rgba(255,107,53,0.02)';
+    ctx.fill();
+
+    // Baseline
+    ctx.strokeStyle = isCurrent ? 'rgba(255,107,53,0.35)' : 'rgba(255,107,53,0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x0, yC);
+    ctx.lineTo(x0 + waveW, yC);
     ctx.stroke();
 
-    ctx.strokeStyle = '#FF6B35';
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
+    // Waveform line
+    ctx.strokeStyle = isCurrent ? '#FF6B35' : `rgba(255,107,53,${0.12 + fi * 0.025})`;
+    ctx.lineWidth   = isCurrent ? 1.5 : 0.75;
+    ctx.lineJoin    = 'round';
     ctx.beginPath();
-    samples.forEach((v, i) => {
-      const x = (i / (samples.length - 1)) * W;
-      const y = H / 2 - v * (H / 2 - 2);
+    for (let i = 0; i < samples.length; i++) {
+      const x = x0 + (i / (samples.length - 1)) * waveW;
+      const y = yC - samples[i] * waveHalf;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
+    }
     ctx.stroke();
-  }, [samples]);
+  }
 
-  return <canvas ref={canvasRef} className="osc-wave-canvas" />;
+  // ── Position cursor on the spine ─────────────────────────────────────────
+  const cursorX = padL + curFrac * PX;
+  const cursorY = baseY - curFrac * PY;
+
+  // Soft glow
+  const grd = ctx.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, 8);
+  grd.addColorStop(0, 'rgba(255,107,53,0.55)');
+  grd.addColorStop(1, 'rgba(255,107,53,0)');
+  ctx.beginPath();
+  ctx.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // Solid dot
+  ctx.beginPath();
+  ctx.arc(cursorX, cursorY, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#FF6B35';
+  ctx.fill();
 }
+
+function WaveformCanvas3D({ frameSamples, wtPos, wtScan, wtRate }) {
+  const canvasRef = useRef(null);
+  // Refs so the rAF loop picks up param changes without restarting
+  const posRef  = useRef(wtPos  ?? 0.5);
+  const scanRef = useRef(wtScan ?? 0);
+  const rateRef = useRef(wtRate ?? 1);
+  posRef.current  = wtPos  ?? 0.5;
+  scanRef.current = wtScan ?? 0;
+  rateRef.current = wtRate ?? 1;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !frameSamples || frameSamples.length === 0) return;
+    let rafId;
+    const tick = (now) => {
+      const t   = now / 1000;
+      const scan = scanRef.current;
+      const pos  = scan > 0
+        ? Math.max(0, Math.min(1,
+            posRef.current + Math.sin(2 * Math.PI * rateRef.current * t) * scan * 0.5))
+        : posRef.current;
+      drawWavetable3D(canvas, frameSamples, pos);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [frameSamples]);
+
+  return <canvas ref={canvasRef} className="osc-wave-canvas osc-wave-3d" />;
+}
+
+// ── Oscillator panel ──────────────────────────────────────────────────────────
 
 function OscPanel({ label, oscKey }) {
   const { params, updateParam } = useSynth();
   const osc = params[oscKey];
   const fileInputRef = useRef(null);
-  const [waveformSamples, setWaveformSamples] = useState(null);
+  const [allFrameSamples, setAllFrameSamples] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!osc.wavetable) setWaveformSamples(null);
+    if (!osc.wavetable) setAllFrameSamples(null);
   }, [osc.wavetable]);
 
   async function handleImageFile(e) {
@@ -80,9 +177,9 @@ function OscPanel({ label, oscKey }) {
     e.target.value = '';
     setLoading(true);
     try {
-      const { frames, waveformSamples: ws } = await imageFileToWavetable(file);
+      const { frames, frameSamples } = await imageFileToWavetable(file);
       updateParam(oscKey, 'wavetable', frames);
-      setWaveformSamples(ws);
+      setAllFrameSamples(frameSamples);
     } catch (err) {
       console.error('Wavetable error:', err);
     } finally {
@@ -92,7 +189,7 @@ function OscPanel({ label, oscKey }) {
 
   function clearWavetable() {
     updateParam(oscKey, 'wavetable', null);
-    setWaveformSamples(null);
+    setAllFrameSamples(null);
   }
 
   function handleWaveChange(v) {
@@ -137,10 +234,15 @@ function OscPanel({ label, oscKey }) {
           </button>
         </div>
 
-        {/* Waveform preview — full width */}
-        {waveformSamples && hasWavetable && (
+        {/* 3D waveform preview — full width */}
+        {allFrameSamples && hasWavetable && (
           <div className="osc-wave-preview">
-            <WaveformCanvas samples={waveformSamples} />
+            <WaveformCanvas3D
+              frameSamples={allFrameSamples}
+              wtPos={osc.wtPos ?? 0.5}
+              wtScan={osc.wtScan ?? 0}
+              wtRate={osc.wtRate ?? 1}
+            />
             <button className="osc-wave-clear" onClick={clearWavetable} title="Clear">×</button>
           </div>
         )}
