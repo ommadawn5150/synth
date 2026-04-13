@@ -58,14 +58,14 @@ function drawWavetable3D(canvas, frameSamples, pos) {
   const N = frameSamples.length;
   if (N < 2) return;
 
-  // Fixed total perspective spread regardless of layer count
+  // Top-down perspective: small X drift, large Y spread
   const padL    = 6;
-  const totalPX = Math.min(W * 0.20, 52);
-  const totalPY = Math.min(H * 0.42, 52);
+  const totalPX = Math.min(W * 0.09, 22);   // subtle horizontal drift
+  const totalPY = Math.min(H * 0.58, 72);   // pronounced vertical stacking
   const PX      = totalPX / (N - 1);
   const PY      = totalPY / (N - 1);
   const waveW   = W - totalPX - padL - 4;
-  const waveHalf = (H - totalPY) / 2 - 5;
+  const waveHalf = (H - totalPY) / 2 - 4;
 
   // fi=0 → front/bottom (wtPos=0), fi=N-1 → back/top (wtPos=1)
   const baseY = H / 2 + totalPY / 2;
