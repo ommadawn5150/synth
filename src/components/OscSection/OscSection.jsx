@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Slider } from '../ui/Slider/Slider';
 import { Selector } from '../ui/Selector/Selector';
 import { Toggle } from '../ui/Toggle/Toggle';
@@ -30,12 +30,16 @@ const NOISE_TYPES = [
 function WaveformCanvas({ samples }) {
   const canvasRef = useRef(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !samples) return;
+    // Match drawing buffer to actual CSS pixel size
+    const W = canvas.offsetWidth  || 200;
+    const H = canvas.offsetHeight || 30;
+    canvas.width  = W;
+    canvas.height = H;
+
     const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
     ctx.strokeStyle = 'rgba(255,107,53,0.25)';
@@ -57,7 +61,7 @@ function WaveformCanvas({ samples }) {
     ctx.stroke();
   }, [samples]);
 
-  return <canvas ref={canvasRef} className="osc-wave-canvas" width={220} height={30} />;
+  return <canvas ref={canvasRef} className="osc-wave-canvas" />;
 }
 
 function OscPanel({ label, oscKey }) {
@@ -78,8 +82,8 @@ function OscPanel({ label, oscKey }) {
     e.target.value = '';
     setLoading(true);
     try {
-      const { partials, waveformSamples: ws } = await imageFileToWavetable(file);
-      updateParam(oscKey, 'wavetable', partials);
+      const { frames, waveformSamples: ws } = await imageFileToWavetable(file);
+      updateParam(oscKey, 'wavetable', frames);
       setWaveformSamples(ws);
     } catch (err) {
       console.error('Wavetable error:', err);
@@ -93,15 +97,15 @@ function OscPanel({ label, oscKey }) {
     setWaveformSamples(null);
   }
 
-  const hasWavetable = !!osc.wavetable;
-  const waveOptions  = hasWavetable
-    ? [...WAVEFORMS, { value: 'custom', label: 'IMG' }]
-    : WAVEFORMS;
-
   function handleWaveChange(v) {
     if (hasWavetable) clearWavetable();
     updateParam(oscKey, 'type', v);
   }
+
+  const hasWavetable = Array.isArray(osc.wavetable) && osc.wavetable.length > 0;
+  const waveOptions  = hasWavetable
+    ? [...WAVEFORMS, { value: 'custom', label: 'IMG' }]
+    : WAVEFORMS;
 
   return (
     <div className="osc-panel">
@@ -111,6 +115,7 @@ function OscPanel({ label, oscKey }) {
       </div>
       <div className={`osc-content ${!osc.enabled ? 'disabled' : ''}`}>
 
+        {/* Wave selector + IMG upload */}
         <div className="osc-wave-row">
           <Selector
             label="Wave"
@@ -134,10 +139,25 @@ function OscPanel({ label, oscKey }) {
           </button>
         </div>
 
+        {/* Waveform preview */}
         {waveformSamples && hasWavetable && (
           <div className="osc-wave-preview">
             <WaveformCanvas samples={waveformSamples} />
-            <button className="osc-wave-clear" onClick={clearWavetable}>×</button>
+            <button className="osc-wave-clear" onClick={clearWavetable} title="Clear">×</button>
+          </div>
+        )}
+
+        {/* Wavetable depth controls — LFO + Env modulation of frame position */}
+        {hasWavetable && (
+          <div className="wt-controls">
+            <Slider label="Pos"  value={osc.wtPos  ?? 0.5} min={0}    max={1}  step={0.01} decimals={2}
+              onChange={v => updateParam(oscKey, 'wtPos',  v)} />
+            <Slider label="LFO"  value={osc.wtScan ?? 0}   min={0}    max={1}  step={0.01} decimals={2}
+              onChange={v => updateParam(oscKey, 'wtScan', v)} />
+            <Slider label="Rate" value={osc.wtRate ?? 1}   min={0.01} max={10} step={0.01} decimals={2} unit=" Hz"
+              onChange={v => updateParam(oscKey, 'wtRate', v)} />
+            <Slider label="Env"  value={osc.wtEnv  ?? 0}   min={-1}   max={1}  step={0.01} decimals={2}
+              onChange={v => updateParam(oscKey, 'wtEnv',  v)} />
           </div>
         )}
 

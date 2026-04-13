@@ -2,18 +2,21 @@ import * as Tone from 'tone';
 
 const UNISON_SPREADS = { 1:[0], 2:[-10,10], 3:[-15,0,15], 4:[-20,-7,7,20], 7:[-30,-20,-10,0,10,20,30] };
 
+const WT_DEFAULTS = { wtPos: 0.5, wtScan: 0, wtRate: 1, wtEnv: 0 };
+
 export class SynthEngine {
   constructor() {
     this.voices = new Map();
     this.params = this._defaultParams();
     this._lfoTarget = null;
     this._buildChain();
+    this._startWtScheduler();
   }
 
   _defaultParams() {
     return {
-      osc1:   { type: 'sawtooth', octave: 0, detune: 0, volume: 0.8, enabled: true, wavetable: null },
-      osc2:   { type: 'square',   octave: 0, semitone: 7, detune: 0, volume: 0.3, enabled: false, wavetable: null },
+      osc1:   { type: 'sawtooth', octave: 0, detune: 0, volume: 0.8, enabled: true,  wavetable: null, ...WT_DEFAULTS },
+      osc2:   { type: 'square',   octave: 0, semitone: 7, detune: 0, volume: 0.3, enabled: false, wavetable: null, ...WT_DEFAULTS },
       osc3:   { type: 'white', volume: 0, enabled: false },
       unison: { voices: 1, spread: 15, width: 0.5 },
       filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -24, enabled: true },
@@ -55,13 +58,84 @@ export class SynthEngine {
     this.lfo = new Tone.LFO({ type: this.params.lfo.type, frequency: this.params.lfo.rate, min: 0, max: 0 }).start();
   }
 
+  // ─── Wavetable morphing scheduler (~30 fps) ───────────────────────
+  _startWtScheduler() {
+    this._wtInterval = setInterval(() => {
+      if (this.voices.size === 0) return;
+      this.voices.forEach(voiceList => {
+        voiceList.forEach(v => {
+          if (v.osc1 && Array.isArray(this.params.osc1.wavetable)) {
+            const p = this._getWtPartials(this.params.osc1, v.startMs);
+            if (p) try { v.osc1.partials = p; } catch(_) {}
+          }
+          if (v.osc2 && Array.isArray(this.params.osc2.wavetable)) {
+            const p = this._getWtPartials(this.params.osc2, v.startMs);
+            if (p) try { v.osc2.partials = p; } catch(_) {}
+          }
+        });
+      });
+    }, 33);
+  }
+
+  // Compute interpolated partials for current time and voice start
+  _getWtPartials(osc, startMs) {
+    const frames = osc.wavetable;
+    if (!Array.isArray(frames) || frames.length === 0) return null;
+    if (frames.length === 1) return frames[0];
+
+    const nowSec     = Date.now() / 1000;
+    const elapsedSec = (Date.now() - (startMs ?? Date.now())) / 1000;
+
+    const lfo = osc.wtScan > 0
+      ? Math.sin(2 * Math.PI * osc.wtRate * nowSec) * osc.wtScan * 0.5
+      : 0;
+
+    const env = osc.wtEnv !== 0
+      ? this._getEnvValue(elapsedSec) * osc.wtEnv
+      : 0;
+
+    const pos = Math.max(0, Math.min(1, (osc.wtPos ?? 0.5) + lfo + env));
+    return this._interpolateFrames(frames, pos);
+  }
+
+  _interpolateFrames(frames, pos) {
+    const floatIdx = pos * (frames.length - 1);
+    const i0 = Math.floor(floatIdx);
+    const i1 = Math.min(i0 + 1, frames.length - 1);
+    const t  = floatIdx - i0;
+    const f0 = frames[i0], f1 = frames[i1];
+    return f0.map((v, k) => v * (1 - t) + (f1[k] ?? 0) * t);
+  }
+
+  // Simplified ADSR value at elapsed time (attack peak = 1)
+  _getEnvValue(elapsedSec) {
+    const { attack, decay, sustain } = this.params.env;
+    if (elapsedSec < attack)
+      return elapsedSec / Math.max(attack, 0.001);
+    if (elapsedSec < attack + decay)
+      return 1 - (1 - sustain) * (elapsedSec - attack) / Math.max(decay, 0.001);
+    return sustain;
+  }
+
+  // Immediately apply WT partials to all active voices for one osc
+  _applyWtToVoices(oscKey) {
+    const osc = this.params[oscKey];
+    if (!Array.isArray(osc.wavetable)) return;
+    this.voices.forEach(vl => vl.forEach(v => {
+      const oscNode = v[oscKey === 'osc1' ? 'osc1' : 'osc2'];
+      if (!oscNode) return;
+      const p = this._getWtPartials(osc, v.startMs);
+      if (p) try { oscNode.partials = p; } catch(_) {}
+    }));
+  }
+
   // ─── Note On/Off ─────────────────────────────────────────────────
   noteOn(note) {
     if (this.voices.has(note)) this.noteOff(note);
     const spreads = UNISON_SPREADS[this.params.unison.voices] || [0];
     const spreadScale = this.params.unison.spread / 15;
-    // OSC3 noise is added only to the first unison voice (no benefit to duplicating noise)
-    const voiceList = spreads.map((offset, i) => this._createVoice(note, offset * spreadScale, i === 0));
+    const startMs = Date.now();
+    const voiceList = spreads.map((offset, i) => this._createVoice(note, offset * spreadScale, i === 0, startMs));
     this.voices.set(note, voiceList);
   }
 
@@ -93,6 +167,7 @@ export class SynthEngine {
   triggerNote(note, time, velocity = 1) {
     const { osc1, osc2, osc3, env: ep } = this.params;
     const stepLen = Tone.Time('16n').toSeconds() * 0.8;
+    const startMs = Date.now();
 
     const voiceOut = new Tone.Gain(velocity).connect(this.voiceBus);
     const envelope = new Tone.AmplitudeEnvelope({ attack: ep.attack, decay: ep.decay, sustain: ep.sustain, release: ep.release }).connect(voiceOut);
@@ -100,14 +175,20 @@ export class SynthEngine {
     const freq = Tone.Frequency(note).toFrequency();
     const osc1Gain = new Tone.Gain(osc1.volume).connect(envelope);
     const oscillator1 = new Tone.Oscillator({ type: osc1.type, frequency: freq * Math.pow(2, osc1.octave), detune: osc1.detune }).connect(osc1Gain);
-    if (osc1.wavetable) oscillator1.partials = osc1.wavetable;
+    if (Array.isArray(osc1.wavetable)) {
+      const p = this._getWtPartials(osc1, startMs);
+      if (p) oscillator1.partials = p;
+    }
     oscillator1.start(time);
 
     let oscillator2 = null, osc2Gain = null;
     if (osc2.enabled) {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       oscillator2 = new Tone.Oscillator({ type: osc2.type, frequency: freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12), detune: osc2.detune }).connect(osc2Gain);
-      if (osc2.wavetable) oscillator2.partials = osc2.wavetable;
+      if (Array.isArray(osc2.wavetable)) {
+        const p = this._getWtPartials(osc2, startMs);
+        if (p) oscillator2.partials = p;
+      }
       oscillator2.start(time);
     }
 
@@ -139,7 +220,7 @@ export class SynthEngine {
     }, cleanup);
   }
 
-  _createVoice(note, detuneOffset, addNoise = false) {
+  _createVoice(note, detuneOffset, addNoise = false, startMs = Date.now()) {
     const freq = Tone.Frequency(note).toFrequency();
     const { osc1, osc2, osc3, env: ep } = this.params;
 
@@ -150,7 +231,10 @@ export class SynthEngine {
     if (osc1.enabled) {
       osc1Gain = new Tone.Gain(osc1.volume).connect(envelope);
       oscillator1 = new Tone.Oscillator({ type: osc1.type, frequency: freq * Math.pow(2, osc1.octave), detune: osc1.detune + detuneOffset }).connect(osc1Gain);
-      if (osc1.wavetable) oscillator1.partials = osc1.wavetable;
+      if (Array.isArray(osc1.wavetable)) {
+        const p = this._getWtPartials(osc1, startMs);
+        if (p) oscillator1.partials = p;
+      }
       oscillator1.start();
     }
 
@@ -159,7 +243,10 @@ export class SynthEngine {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       const osc2Freq = freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12);
       oscillator2 = new Tone.Oscillator({ type: osc2.type, frequency: osc2Freq, detune: osc2.detune + detuneOffset }).connect(osc2Gain);
-      if (osc2.wavetable) oscillator2.partials = osc2.wavetable;
+      if (Array.isArray(osc2.wavetable)) {
+        const p = this._getWtPartials(osc2, startMs);
+        if (p) oscillator2.partials = p;
+      }
       oscillator2.start();
     }
 
@@ -176,7 +263,7 @@ export class SynthEngine {
     }
 
     envelope.triggerAttack();
-    return { osc1: oscillator1, osc2: oscillator2, noise: noiseNode, env: envelope, osc1Gain, osc2Gain, noiseGain, voiceOut };
+    return { osc1: oscillator1, osc2: oscillator2, noise: noiseNode, env: envelope, osc1Gain, osc2Gain, noiseGain, voiceOut, startMs };
   }
 
   // ─── LFO ─────────────────────────────────────────────────────────
@@ -230,11 +317,19 @@ export class SynthEngine {
       this.voices.forEach(vl => vl.forEach(v => v.osc1Gain?.gain.rampTo(value, 0.05)));
     if (key === 'type' && !this.params.osc1.wavetable)
       this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc1) v.osc1.type = value; } catch(_){} }));
-    if (key === 'wavetable')
+    if (key === 'wavetable') {
       this.voices.forEach(vl => vl.forEach(v => { try {
         if (!v.osc1) return;
-        value ? (v.osc1.partials = value) : (v.osc1.type = this.params.osc1.type);
+        if (value) {
+          const p = this._getWtPartials(this.params.osc1, v.startMs);
+          if (p) v.osc1.partials = p;
+        } else {
+          v.osc1.type = this.params.osc1.type;
+        }
       } catch(_){} }));
+    }
+    if (['wtPos', 'wtScan', 'wtRate', 'wtEnv'].includes(key))
+      this._applyWtToVoices('osc1');
   }
 
   setOsc2(key, value) {
@@ -243,17 +338,24 @@ export class SynthEngine {
       this.voices.forEach(vl => vl.forEach(v => v.osc2Gain?.gain.rampTo(value, 0.05)));
     if (key === 'type' && !this.params.osc2.wavetable)
       this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc2) v.osc2.type = value; } catch(_){} }));
-    if (key === 'wavetable')
+    if (key === 'wavetable') {
       this.voices.forEach(vl => vl.forEach(v => { try {
         if (!v.osc2) return;
-        value ? (v.osc2.partials = value) : (v.osc2.type = this.params.osc2.type);
+        if (value) {
+          const p = this._getWtPartials(this.params.osc2, v.startMs);
+          if (p) v.osc2.partials = p;
+        } else {
+          v.osc2.type = this.params.osc2.type;
+        }
       } catch(_){} }));
+    }
+    if (['wtPos', 'wtScan', 'wtRate', 'wtEnv'].includes(key))
+      this._applyWtToVoices('osc2');
   }
 
   setOsc3(key, value) {
     this.params.osc3[key] = value;
     if (key === 'volume') this.voices.forEach(vl => vl.forEach(v => v.noiseGain?.gain.rampTo(value, 0.05)));
-    // 'type' and 'enabled' take effect on the next noteOn
   }
 
   setFilter(key, value) {
@@ -304,6 +406,14 @@ export class SynthEngine {
   loadPreset(preset) {
     this.allNotesOff();
     this.params = JSON.parse(JSON.stringify(preset));
+    // Ensure wavetable fields are clean after preset load
+    ['osc1', 'osc2'].forEach(k => {
+      this.params[k].wavetable = null;
+      this.params[k].wtPos  ??= 0.5;
+      this.params[k].wtScan ??= 0;
+      this.params[k].wtRate ??= 1;
+      this.params[k].wtEnv  ??= 0;
+    });
     this.filter.type = this.params.filter.enabled ? this.params.filter.type : 'allpass';
     this.filter.frequency.rampTo(this.params.filter.frequency, 0.05);
     this.filter.Q.rampTo(this.params.filter.Q, 0.05);
@@ -319,6 +429,7 @@ export class SynthEngine {
   }
 
   dispose() {
+    if (this._wtInterval) clearInterval(this._wtInterval);
     this.allNotesOff();
     try { this.lfo.dispose();        } catch(_) {}
     try { this.filter.dispose();     } catch(_) {}
