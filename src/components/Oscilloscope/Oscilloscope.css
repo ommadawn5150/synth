@@ -1,0 +1,21 @@
+.oscilloscope-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.oscilloscope-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+
+.oscilloscope-canvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}

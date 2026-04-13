@@ -93,13 +93,11 @@ export function Sequencer() {
 
         <div className="seq-bpm">
           <span className="seq-label">BPM</span>
-          {!collapsed && (
-            <input
-              type="range" min={40} max={240} value={seq.bpm}
-              onChange={e => setSeqBPM(Number(e.target.value))}
-              className="seq-slider"
-            />
-          )}
+          <input
+            type="range" min={40} max={240} value={seq.bpm}
+            onChange={e => setSeqBPM(Number(e.target.value))}
+            className="seq-slider"
+          />
           <span className="seq-bpm-val">{seq.bpm}</span>
         </div>
 

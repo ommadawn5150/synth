@@ -34,6 +34,10 @@ export class SynthEngine {
   _buildChain() {
     this.masterGain = new Tone.Gain(this.params.amp.volume).toDestination();
 
+    // Oscilloscope analyser — parallel tap on masterGain
+    this._analyser = new Tone.Analyser({ type: 'waveform', size: 2048 });
+    this.masterGain.connect(this._analyser);
+
     this.reverb = new Tone.Reverb({ decay: this.params.effects.reverb.decay, wet: 0 });
     this.reverb.generate();
     this.delay  = new Tone.FeedbackDelay({ delayTime: this.params.effects.delay.time, feedback: this.params.effects.delay.feedback, wet: 0 });
@@ -465,5 +469,8 @@ export class SynthEngine {
     try { this.reverbTone.dispose(); } catch(_) {}
     try { this.voiceBus.dispose();   } catch(_) {}
     try { this.masterGain.dispose(); } catch(_) {}
+    try { this._analyser.dispose();  } catch(_) {}
   }
+
+  getAnalyserNode() { return this._analyser; }
 }

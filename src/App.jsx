@@ -13,13 +13,13 @@ import { Sequencer } from './components/Sequencer/Sequencer';
 import { applyTheme } from './themes/themes';
 import './App.css';
 
-// SEQ tab removed — sequencer is always visible at the bottom on mobile
 const TABS = [
   { id: 'osc',    label: 'OSC' },
   { id: 'filter', label: 'FILTER' },
   { id: 'env',    label: 'ENV' },
   { id: 'lfo',    label: 'LFO' },
   { id: 'fx',     label: 'FX' },
+  { id: 'amp',    label: 'AMP' },
 ];
 
 function SynthApp() {
@@ -84,6 +84,7 @@ function SynthApp() {
           {activeTab === 'env'    && <EnvSection />}
           {activeTab === 'lfo'    && <LFOSection />}
           {activeTab === 'fx'     && <EffectsSection />}
+          {activeTab === 'amp'    && <AmpSection />}
         </div>
         <div className="mobile-seq">
           <Sequencer />
