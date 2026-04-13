@@ -13,6 +13,9 @@ export const SCALES = {
 
 export const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
+export const DIRECTIONS = ['forward', 'backward', 'pingpong', 'random'];
+export const DIRECTION_ICONS = { forward: '→', backward: '←', pingpong: '↔', random: '??' };
+
 function buildScaleNotes(root, scale, octaveRange = [3, 5]) {
   const rootIdx = NOTE_NAMES.indexOf(root);
   const notes = [];
@@ -26,7 +29,14 @@ function buildScaleNotes(root, scale, octaveRange = [3, 5]) {
 }
 
 export function defaultStep(note = 'C4') {
-  return { active: false, note, velocity: 0.8 };
+  return { active: false, note, velocity: 0.8, prob: 100 };
+}
+
+// Euclidean (Bresenham) rhythm: distributes `beats` onsets across `steps` as evenly as possible
+export function euclideanRhythm(beats, steps) {
+  if (beats <= 0) return Array(steps).fill(false);
+  if (beats >= steps) return Array(steps).fill(true);
+  return Array.from({ length: steps }, (_, i) => ((i * beats) % steps) < beats);
 }
 
 export class SequencerEngine {
@@ -39,44 +49,79 @@ export class SequencerEngine {
     this.playing = false;
     this._stepData = null;
     this.onStep = null;
+    this.direction = 'forward';
+    this._pingpongDir = 1;
+    this._seqId = null;
 
     Tone.getTransport().bpm.value = this.bpm;
-
-    this._sequence = new Tone.Sequence(
-      (time, step) => this._tick(time, step),
-      Array.from({ length: this.steps }, (_, i) => i),
-      this.stepLength
-    );
   }
 
-  _tick(time, step) {
-    this.currentStep = step;
+  _tick(time) {
+    const step = this.currentStep;
     const s = this._stepData?.[step];
     if (s?.active && s.note) {
-      this.synth.triggerNote(s.note, time, s.velocity ?? 0.8);
+      const prob = (s.prob ?? 100) / 100;
+      if (Math.random() < prob) {
+        this.synth.triggerNote(s.note, time, s.velocity ?? 0.8);
+      }
     }
     if (this.onStep) {
       Tone.getDraw().schedule(() => this.onStep(step), time);
+    }
+    this._advanceStep();
+  }
+
+  _advanceStep() {
+    const n = this.steps;
+    switch (this.direction) {
+      case 'backward':
+        this.currentStep = (this.currentStep - 1 + n) % n;
+        break;
+      case 'pingpong':
+        this.currentStep += this._pingpongDir;
+        if (this.currentStep >= n - 1) { this.currentStep = n - 1; this._pingpongDir = -1; }
+        else if (this.currentStep <= 0) { this.currentStep = 0; this._pingpongDir = 1; }
+        break;
+      case 'random':
+        this.currentStep = Math.floor(Math.random() * n);
+        break;
+      default: // forward
+        this.currentStep = (this.currentStep + 1) % n;
+    }
+  }
+
+  _resetStep() {
+    this._pingpongDir = 1;
+    switch (this.direction) {
+      case 'backward':  this.currentStep = this.steps - 1; break;
+      case 'random':    this.currentStep = Math.floor(Math.random() * this.steps); break;
+      default:          this.currentStep = 0;
     }
   }
 
   setStepCallback(cb) { this.onStep = cb; }
 
-  // stepData is set externally via updateStepData before calling start().
-  // This avoids race conditions when callers update stepData right after
-  // calling setStepCount() or loadPreset().
   async start() {
     await Tone.start();
-    this._sequence.callback = (time, step) => this._tick(time, step);
-    // Always stop then re-schedule so restart after stop works correctly
-    try { this._sequence.stop(); } catch(_) {}
-    this._sequence.start(0);
+    // Clear any existing repeat event
+    if (this._seqId !== null) {
+      Tone.getTransport().clear(this._seqId);
+      this._seqId = null;
+    }
+    this._resetStep();
+    this._seqId = Tone.getTransport().scheduleRepeat(
+      (time) => this._tick(time),
+      this.stepLength
+    );
     Tone.getTransport().start();
     this.playing = true;
   }
 
   stop() {
-    this._sequence.stop();
+    if (this._seqId !== null) {
+      Tone.getTransport().clear(this._seqId);
+      this._seqId = null;
+    }
     Tone.getTransport().stop();
     Tone.getTransport().position = 0;
     this.currentStep = 0;
@@ -93,22 +138,18 @@ export class SequencerEngine {
     Tone.getTransport().bpm.rampTo(bpm, 0.1);
   }
 
-  // Rebuilds the sequence for a new step count.
-  // Stops if currently playing. Does NOT auto-restart — caller handles restart.
+  setDirection(dir) {
+    this.direction = dir;
+    if (dir === 'pingpong') this._pingpongDir = 1;
+  }
+
   setStepCount(count) {
     if (this.playing) this.stop();
     this.steps = count;
-    this._sequence.dispose();
-    this._sequence = new Tone.Sequence(
-      (time, step) => this._tick(time, step),
-      Array.from({ length: count }, (_, i) => i),
-      this.stepLength
-    );
   }
 
   dispose() {
     this.stop();
-    try { this._sequence.dispose(); } catch(_) {}
   }
 }
 

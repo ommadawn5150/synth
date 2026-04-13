@@ -1,5 +1,6 @@
 import { Slider } from '../ui/Slider/Slider';
 import { Toggle } from '../ui/Toggle/Toggle';
+import { ChaosPad } from '../ChaosPad/ChaosPad';
 import { useSynth } from '../../contexts/SynthContext';
 import './EffectsSection.css';
 
@@ -48,6 +49,8 @@ export function EffectsSection() {
           formatValue={fmtKHz} unit=" Hz" onChange={v => updateEffect('reverb', 'tone', Math.round(v))} />
         <Slider label="Wet"   value={reverb.wet}           min={0}   max={1}     step={0.01} decimals={2}          onChange={v => updateEffect('reverb', 'wet',   v)} />
       </EffectGroup>
+
+      <ChaosPad />
     </div>
   );
 }

@@ -67,7 +67,8 @@
 .seq-slider { width: 80px; accent-color: var(--accent); cursor: pointer; }
 .seq-bpm-val { font-size: 11px; font-weight: 700; color: var(--text); min-width: 28px; text-align: right; }
 
-.seq-steps-control, .seq-scale-control { display: flex; align-items: center; gap: 5px; }
+.seq-steps-control, .seq-scale-control,
+.seq-direction-control, .seq-euclid-control { display: flex; align-items: center; gap: 5px; }
 
 .seq-count-btn {
   background: var(--bg-section);
@@ -148,6 +149,26 @@
   color: rgba(255,255,255,0.7);
   line-height: 1;
   cursor: pointer;
+}
+
+/* Probability indicator bar at the bottom of active steps */
+.seq-step-prob {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 0 0 3px 3px;
+  pointer-events: none;
+  transition: width 0.15s;
+}
+
+/* Note picker probability row */
+.note-picker-prob {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 /* ── Note Picker Bar ─────────────────────────────── */
@@ -255,6 +276,21 @@
 .seq-preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 .seq-overwrite-btn { font-size: 13px; padding: 2px 7px; }
+.seq-mutate-btn { letter-spacing: 0.04em; }
+
+.seq-euclid-input {
+  width: 38px;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 10px;
+  font-family: inherit;
+  padding: 3px 5px;
+  text-align: center;
+  outline: none;
+}
+.seq-euclid-input:focus { border-color: var(--accent); }
 
 .seq-preset-del {
   background: var(--bg-section);

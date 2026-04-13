@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { SynthEngine } from '../engine/SynthEngine';
-import { SequencerEngine, buildScaleNotes, SCALES, ROOTS, defaultStep } from '../engine/SequencerEngine';
+import { SequencerEngine, buildScaleNotes, euclideanRhythm, SCALES, ROOTS, defaultStep } from '../engine/SequencerEngine';
 import { PRESETS } from '../presets/presets';
 
 const SynthContext = createContext(null);
@@ -34,6 +34,7 @@ const DEFAULT_SEQ = {
   stepCount: 16,
   playing: false,
   currentStep: -1,
+  direction: 'forward',
 };
 
 export function SynthProvider({ children }) {
@@ -125,10 +126,8 @@ export function SynthProvider({ children }) {
   // ── Sequencer ────────────────────────────────────────────────────
   function seqPlay() {
     const se = seqEngineRef.current;
-    // Guard: don't double-start. Use engine's playing flag (sync) not React state.
     if (!se || se.playing) return;
     se.setBPM(seq.bpm);
-    // Always sync latest React steps to engine before starting
     se.updateStepData(seq.steps);
     se.start().then(() => setSeq(prev => ({ ...prev, playing: true })));
   }
@@ -141,7 +140,6 @@ export function SynthProvider({ children }) {
   function seqToggle() {
     const se = seqEngineRef.current;
     if (!se) return;
-    // Use engine's playing flag as source of truth to avoid stale React state
     if (se.playing) seqStop(); else seqPlay();
   }
 
@@ -164,15 +162,12 @@ export function SynthProvider({ children }) {
 
     setSeq(prev => {
       const steps = Array.from({ length: count }, (_, i) => prev.steps[i] ?? defaultStep());
-      // Update engine step data inside updater so it's computed from prev state
       se?.updateStepData(steps);
       return { ...prev, stepCount: count, steps };
     });
 
-    // setStepCount stops if playing and rebuilds the sequence
     se?.setStepCount(count);
 
-    // Restart playback with the new sequence if it was playing
     if (wasPlaying) {
       se?.start().then(() => setSeq(prev => ({ ...prev, playing: true })));
     }
@@ -180,6 +175,56 @@ export function SynthProvider({ children }) {
 
   function setSeqScale(root, scale) {
     setSeq(prev => ({ ...prev, root, scale }));
+  }
+
+  function setSeqDirection(dir) {
+    setSeq(prev => ({ ...prev, direction: dir }));
+    seqEngineRef.current?.setDirection(dir);
+  }
+
+  // Randomly evolve the pattern: toggle some steps, shift some notes
+  function seqMutate() {
+    setSeq(prev => {
+      const notes = buildScaleNotes(prev.root, SCALES[prev.scale] || SCALES.minor);
+      const steps = prev.steps.map(s => {
+        let ns = { ...s };
+        // ~25% chance to toggle active
+        if (Math.random() < 0.25) ns.active = !ns.active;
+        // ~30% chance to shift note by ±1 scale step (active steps only)
+        if (ns.active && notes.length > 1 && Math.random() < 0.30) {
+          const idx = notes.indexOf(ns.note);
+          const base = idx < 0 ? Math.floor(notes.length / 2) : idx;
+          const shift = Math.random() < 0.5 ? 1 : -1;
+          ns.note = notes[Math.max(0, Math.min(notes.length - 1, base + shift))];
+        }
+        // ~20% chance to tweak probability (±20, rounded to 5)
+        if (Math.random() < 0.20) {
+          const delta = Math.random() < 0.5 ? -20 : 20;
+          ns.prob = Math.round(Math.max(10, Math.min(100, (ns.prob ?? 100) + delta)) / 5) * 5;
+        }
+        return ns;
+      });
+      seqEngineRef.current?.updateStepData(steps);
+      return { ...prev, steps };
+    });
+  }
+
+  // Generate Euclidean rhythm and distribute scale notes across active steps
+  function generateEuclidean(beats) {
+    setSeq(prev => {
+      const notes = buildScaleNotes(prev.root, SCALES[prev.scale] || SCALES.minor);
+      const pattern = euclideanRhythm(beats, prev.stepCount);
+      let noteIdx = 0;
+      const steps = prev.steps.map((s, i) => {
+        const active = pattern[i] ?? false;
+        if (active) {
+          return { ...s, active: true, note: notes[noteIdx++ % notes.length], prob: 100 };
+        }
+        return { ...s, active: false };
+      });
+      seqEngineRef.current?.updateStepData(steps);
+      return { ...prev, steps };
+    });
   }
 
   function saveSeqPreset(name) {
@@ -191,6 +236,7 @@ export function SynthProvider({ children }) {
       steps: JSON.parse(JSON.stringify(seq.steps)),
       root: seq.root,
       scale: seq.scale,
+      direction: seq.direction,
     };
     const updated = [...seqPresets.filter(p => p.name !== name), preset];
     setSeqPresets(updated);
@@ -209,6 +255,7 @@ export function SynthProvider({ children }) {
       steps: JSON.parse(JSON.stringify(seq.steps)),
       root: seq.root,
       scale: seq.scale,
+      direction: seq.direction,
     };
     const updated = seqPresets.map(p => p.id === currentSeqPresetId ? preset : p);
     setSeqPresets(updated);
@@ -218,14 +265,13 @@ export function SynthProvider({ children }) {
   function loadSeqPreset(preset) {
     const se = seqEngineRef.current;
     const steps = Array.from({ length: preset.stepCount }, (_, i) => preset.steps[i] ?? defaultStep());
+    const direction = preset.direction ?? 'forward';
 
-    // Stop playback first to avoid race with setStepCount's internal stop
     if (se?.playing) se.stop();
 
     se?.setBPM(preset.bpm);
-    // setStepCount rebuilds the sequence; does NOT auto-restart
     se?.setStepCount(preset.stepCount);
-    // updateStepData sets the correct steps AFTER the sequence is rebuilt
+    se?.setDirection(direction);
     se?.updateStepData(steps);
 
     setCurrentSeqPresetId(preset.id);
@@ -238,6 +284,7 @@ export function SynthProvider({ children }) {
       scale: preset.scale,
       playing: false,
       currentStep: -1,
+      direction,
     }));
   }
 
@@ -258,6 +305,7 @@ export function SynthProvider({ children }) {
       wtDisplaySamples, setWtDisplaySamples,
       seq, scaleNotes,
       seqToggle, seqStop, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
+      setSeqDirection, seqMutate, generateEuclidean,
       seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
     }}>
       {children}

@@ -1,0 +1,100 @@
+.chaos-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.chaos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chaos-assign-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chaos-axis-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── The pad itself ─────────────────────────────── */
+.chaos-pad {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: crosshair;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.chaos-grid-h,
+.chaos-grid-v {
+  position: absolute;
+  background: var(--border);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.chaos-grid-h { top: 50%; left: 0; right: 0; height: 1px; }
+.chaos-grid-v { left: 50%; top: 0; bottom: 0; width: 1px; }
+
+.chaos-cursor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent), 0 0 3px rgba(0,0,0,0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left 0.04s linear, top 0.04s linear;
+}
+
+.chaos-label {
+  position: absolute;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  pointer-events: none;
+  opacity: 0.8;
+}
+.chaos-label-x { bottom: 5px; right: 7px; }
+.chaos-label-y { top: 5px; left: 7px; }
+
+/* ── Gyro controls ──────────────────────────────── */
+.chaos-gyro-btn {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.chaos-gyro-btn:hover  { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chaos-gyro-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.chaos-gyro-sens {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

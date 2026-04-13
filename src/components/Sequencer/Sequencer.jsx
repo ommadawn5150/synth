@@ -5,11 +5,14 @@ import './Sequencer.css';
 
 const STEP_COUNTS = [8, 16, 32];
 const LONG_PRESS_MS = 400;
+const DIRECTIONS = ['forward', 'backward', 'pingpong', 'random'];
+const DIR_ICON = { forward: '→', backward: '←', pingpong: '↔', random: '??' };
 
 export function Sequencer() {
   const {
     seq, scaleNotes,
     seqToggle, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
+    setSeqDirection, seqMutate, generateEuclidean,
     seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
   } = useSynth();
 
@@ -17,6 +20,7 @@ export function Sequencer() {
   const [notePickerIdx, setNotePickerIdx] = useState(null);
   const [saveName, setSaveName] = useState('');
   const [showSaveInput, setShowSaveInput] = useState(false);
+  const [euclidBeats, setEuclidBeats] = useState(4);
   const longPressTimer = useRef(null);
   const didLongPress = useRef(false);
   const pickerRef = useRef(null);
@@ -112,6 +116,17 @@ export function Sequencer() {
             ))}
           </div>
 
+          <div className="seq-direction-control">
+            <span className="seq-label">Dir</span>
+            {DIRECTIONS.map(dir => (
+              <button key={dir}
+                className={`seq-count-btn ${seq.direction === dir ? 'active' : ''}`}
+                onClick={() => setSeqDirection(dir)}
+                title={dir}
+              >{DIR_ICON[dir]}</button>
+            ))}
+          </div>
+
           <div className="seq-scale-control">
             <span className="seq-label">Root</span>
             <select className="seq-select" value={seq.root}
@@ -124,6 +139,24 @@ export function Sequencer() {
               {Object.keys(SCALES).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+
+          <div className="seq-euclid-control">
+            <span className="seq-label">Euclid</span>
+            <input
+              type="number" min={1} max={seq.stepCount}
+              value={euclidBeats}
+              onChange={e => setEuclidBeats(Math.max(1, Math.min(seq.stepCount, Number(e.target.value))))}
+              className="seq-euclid-input"
+            />
+            <button className="seq-count-btn"
+              onClick={() => generateEuclidean(Math.max(1, Math.min(seq.stepCount, euclidBeats)))}>
+              GEN
+            </button>
+          </div>
+
+          <button className="seq-count-btn seq-mutate-btn" onClick={seqMutate}>
+            ⚂ MUTATE
+          </button>
         </>}
 
         <button
@@ -159,6 +192,9 @@ export function Sequencer() {
                 ✎
               </span>
             )}
+            {step.active && (step.prob ?? 100) < 100 && (
+              <div className="seq-step-prob" style={{ width: `${step.prob ?? 100}%` }} />
+            )}
           </button>
         ))}
       </div>}
@@ -177,6 +213,16 @@ export function Sequencer() {
                 {n}
               </button>
             ))}
+          </div>
+          <div className="note-picker-prob">
+            <span className="seq-label">PROB</span>
+            <input
+              type="range" min={0} max={100} step={5}
+              value={seq.steps[notePickerIdx]?.prob ?? 100}
+              onChange={e => setSeqStep(notePickerIdx, { prob: Number(e.target.value) })}
+              className="seq-slider"
+            />
+            <span className="seq-bpm-val">{seq.steps[notePickerIdx]?.prob ?? 100}%</span>
           </div>
           <button className="note-picker-close" onClick={() => setNotePickerIdx(null)}>×</button>
         </div>
@@ -218,7 +264,7 @@ export function Sequencer() {
       </div>}
 
       {!collapsed && <div className="seq-hint">
-        Tap: on/off &nbsp;·&nbsp; Long press / ✎ / Right-click: select note
+        Tap: on/off &nbsp;·&nbsp; Long press / ✎ / Right-click: note &amp; prob
       </div>}
     </div>
   );
