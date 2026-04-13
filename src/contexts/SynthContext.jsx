@@ -116,6 +116,7 @@ export function SynthProvider({ children }) {
 
   function noteOn(note)  { engineRef.current?.noteOn(note); }
   function noteOff(note) { engineRef.current?.noteOff(note); }
+  function getWtDisplayPos(oscKey) { return engineRef.current?.getWtDisplayPos(oscKey) ?? 0.5; }
 
   // ── Sequencer ────────────────────────────────────────────────────
   function seqPlay() {
@@ -249,7 +250,7 @@ export function SynthProvider({ children }) {
     <SynthContext.Provider value={{
       params, currentPreset, customPresets,
       updateParam, updateEffect, loadPreset, savePreset, deleteCustomPreset,
-      noteOn, noteOff,
+      noteOn, noteOff, getWtDisplayPos,
       seq, scaleNotes,
       seqToggle, seqStop, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
       seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,

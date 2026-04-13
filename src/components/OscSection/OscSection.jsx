@@ -127,33 +127,21 @@ function drawWavetable3D(canvas, frameSamples, pos) {
   ctx.fill();
 }
 
-function WaveformCanvas3D({ frameSamples, wtPos, wtScan, wtRate }) {
+function WaveformCanvas3D({ frameSamples, oscKey }) {
   const canvasRef = useRef(null);
-  // Refs so the rAF loop picks up param changes without restarting
-  const posRef  = useRef(wtPos  ?? 0.5);
-  const scanRef = useRef(wtScan ?? 0);
-  const rateRef = useRef(wtRate ?? 1);
-  posRef.current  = wtPos  ?? 0.5;
-  scanRef.current = wtScan ?? 0;
-  rateRef.current = wtRate ?? 1;
+  const { getWtDisplayPos } = useSynth();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !frameSamples || frameSamples.length === 0) return;
     let rafId;
-    const tick = (now) => {
-      const t   = now / 1000;
-      const scan = scanRef.current;
-      const pos  = scan > 0
-        ? Math.max(0, Math.min(1,
-            posRef.current + Math.sin(2 * Math.PI * rateRef.current * t) * scan * 0.5))
-        : posRef.current;
-      drawWavetable3D(canvas, frameSamples, pos);
+    const tick = () => {
+      drawWavetable3D(canvas, frameSamples, getWtDisplayPos(oscKey));
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [frameSamples]);
+  }, [frameSamples, oscKey, getWtDisplayPos]);
 
   return <canvas ref={canvasRef} className="osc-wave-canvas osc-wave-3d" />;
 }
@@ -237,12 +225,7 @@ function OscPanel({ label, oscKey }) {
         {/* 3D waveform preview — full width */}
         {allFrameSamples && hasWavetable && (
           <div className="osc-wave-preview">
-            <WaveformCanvas3D
-              frameSamples={allFrameSamples}
-              wtPos={osc.wtPos ?? 0.5}
-              wtScan={osc.wtScan ?? 0}
-              wtRate={osc.wtRate ?? 1}
-            />
+            <WaveformCanvas3D frameSamples={allFrameSamples} oscKey={oscKey} />
             <button className="osc-wave-clear" onClick={clearWavetable} title="Clear">×</button>
           </div>
         )}

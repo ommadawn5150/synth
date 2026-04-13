@@ -60,7 +60,28 @@ export class SynthEngine {
 
   // ─── Wavetable morphing scheduler (~30 fps) ───────────────────────
   _startWtScheduler() {
+    // Display position: read by canvas rAF via getWtDisplayPos()
+    this._wtDisplayPos = { osc1: 0.5, osc2: 0.5 };
+    // startMs of the most recently triggered note (for envelope display)
+    this._wtDisplayMs  = null;
+
+    const computeDisplayPos = (osc) => {
+      const nowSec  = Date.now() / 1000;
+      const lfo     = osc.wtScan > 0
+        ? Math.sin(2 * Math.PI * osc.wtRate * nowSec) * osc.wtScan * 0.5
+        : 0;
+      const elapsed = this._wtDisplayMs != null ? (Date.now() - this._wtDisplayMs) / 1000 : 0;
+      const env     = osc.wtEnv !== 0 && this._wtDisplayMs != null
+        ? this._getEnvValue(elapsed) * osc.wtEnv
+        : 0;
+      return Math.max(0, Math.min(1, (osc.wtPos ?? 0.5) + lfo + env));
+    };
+
     this._wtInterval = setInterval(() => {
+      // Always update display positions (LFO + envelope)
+      this._wtDisplayPos.osc1 = computeDisplayPos(this.params.osc1);
+      this._wtDisplayPos.osc2 = computeDisplayPos(this.params.osc2);
+
       if (this.voices.size === 0) return;
       this.voices.forEach(voiceList => {
         voiceList.forEach(v => {
@@ -75,6 +96,10 @@ export class SynthEngine {
         });
       });
     }, 33);
+  }
+
+  getWtDisplayPos(oscKey) {
+    return this._wtDisplayPos?.[oscKey] ?? 0.5;
   }
 
   // Compute interpolated partials for current time and voice start
@@ -135,6 +160,7 @@ export class SynthEngine {
     const spreads = UNISON_SPREADS[this.params.unison.voices] || [0];
     const spreadScale = this.params.unison.spread / 15;
     const startMs = Date.now();
+    this._wtDisplayMs = startMs;   // track for envelope display
     const voiceList = spreads.map((offset, i) => this._createVoice(note, offset * spreadScale, i === 0, startMs));
     this.voices.set(note, voiceList);
   }
