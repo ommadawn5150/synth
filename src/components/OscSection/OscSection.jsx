@@ -176,15 +176,16 @@ function WaveformCanvas3D({ frameSamples, oscKey }) {
 // ── Oscillator panel ──────────────────────────────────────────────────────────
 
 function OscPanel({ label, oscKey }) {
-  const { params, updateParam } = useSynth();
+  const { params, updateParam, wtDisplaySamples, setWtDisplaySamples } = useSynth();
   const osc = params[oscKey];
   const fileInputRef = useRef(null);
-  const [allFrameSamples, setAllFrameSamples] = useState(null);
+  const allFrameSamples = wtDisplaySamples[oscKey];  // persists across tab navigation
   const [loading, setLoading] = useState(false);
 
+  // Clear display samples if wavetable is cleared externally (preset load etc.)
   useEffect(() => {
-    if (!osc.wavetable) setAllFrameSamples(null);
-  }, [osc.wavetable]);
+    if (!osc.wavetable) setWtDisplaySamples(prev => ({ ...prev, [oscKey]: null }));
+  }, [osc.wavetable, oscKey, setWtDisplaySamples]);
 
   async function handleImageFile(e) {
     const file = e.target.files?.[0];
@@ -194,7 +195,7 @@ function OscPanel({ label, oscKey }) {
     try {
       const { frames, frameSamples } = await imageFileToWavetable(file);
       updateParam(oscKey, 'wavetable', frames);
-      setAllFrameSamples(frameSamples);
+      setWtDisplaySamples(prev => ({ ...prev, [oscKey]: frameSamples }));
     } catch (err) {
       console.error('Wavetable error:', err);
     } finally {
@@ -204,7 +205,7 @@ function OscPanel({ label, oscKey }) {
 
   function clearWavetable() {
     updateParam(oscKey, 'wavetable', null);
-    setAllFrameSamples(null);
+    setWtDisplaySamples(prev => ({ ...prev, [oscKey]: null }));
   }
 
   function handleWaveChange(v) {

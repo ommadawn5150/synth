@@ -51,6 +51,8 @@ export function SynthProvider({ children }) {
     catch { return []; }
   });
   const [currentSeqPresetId, setCurrentSeqPresetId] = useState(null);
+  // Visual samples for 3D wavetable display (persists across tab navigation)
+  const [wtDisplaySamples, setWtDisplaySamples] = useState({ osc1: null, osc2: null });
 
   useEffect(() => {
     const engine = new SynthEngine();
@@ -97,6 +99,7 @@ export function SynthProvider({ children }) {
     setParams(JSON.parse(JSON.stringify(preset)));
     setCurrentPreset(preset.id);
     engineRef.current?.loadPreset(preset);
+    setWtDisplaySamples({ osc1: null, osc2: null });
   }
 
   function savePreset(name) {
@@ -251,6 +254,7 @@ export function SynthProvider({ children }) {
       params, currentPreset, customPresets,
       updateParam, updateEffect, loadPreset, savePreset, deleteCustomPreset,
       noteOn, noteOff, getWtDisplayPos,
+      wtDisplaySamples, setWtDisplaySamples,
       seq, scaleNotes,
       seqToggle, seqStop, setSeqBPM, setSeqStep, setSeqStepCount, setSeqScale,
       seqPresets, currentSeqPresetId, saveSeqPreset, overwriteSeqPreset, loadSeqPreset, deleteSeqPreset,
