@@ -33,7 +33,6 @@ function WaveformCanvas({ samples }) {
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !samples) return;
-    // Match drawing buffer to actual CSS pixel size
     const W = canvas.offsetWidth  || 200;
     const H = canvas.offsetHeight || 30;
     canvas.width  = W;
@@ -71,7 +70,6 @@ function OscPanel({ label, oscKey }) {
   const [waveformSamples, setWaveformSamples] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Sync preview when wavetable cleared externally (preset load etc.)
   useEffect(() => {
     if (!osc.wavetable) setWaveformSamples(null);
   }, [osc.wavetable]);
@@ -115,7 +113,7 @@ function OscPanel({ label, oscKey }) {
       </div>
       <div className={`osc-content ${!osc.enabled ? 'disabled' : ''}`}>
 
-        {/* Wave selector + IMG upload */}
+        {/* Wave selector + IMG upload — full width */}
         <div className="osc-wave-row">
           <Selector
             label="Wave"
@@ -139,7 +137,7 @@ function OscPanel({ label, oscKey }) {
           </button>
         </div>
 
-        {/* Waveform preview */}
+        {/* Waveform preview — full width */}
         {waveformSamples && hasWavetable && (
           <div className="osc-wave-preview">
             <WaveformCanvas samples={waveformSamples} />
@@ -147,7 +145,7 @@ function OscPanel({ label, oscKey }) {
           </div>
         )}
 
-        {/* Wavetable depth controls — LFO + Env modulation of frame position */}
+        {/* Wavetable depth controls — horizontal row */}
         {hasWavetable && (
           <div className="wt-controls">
             <Slider label="Pos"  value={osc.wtPos  ?? 0.5} min={0}    max={1}  step={0.01} decimals={2}
@@ -161,16 +159,20 @@ function OscPanel({ label, oscKey }) {
           </div>
         )}
 
-        <Selector label="Oct" options={OCTAVES} value={osc.octave}
-          onChange={v => updateParam(oscKey, 'octave', v)} />
-        <Slider label="Detune" value={osc.detune} min={-100} max={100} step={1}
-          decimals={0} unit=" ¢" onChange={v => updateParam(oscKey, 'detune', v)} />
-        <Slider label="Vol" value={osc.volume} min={0} max={1} step={0.01}
-          decimals={2} onChange={v => updateParam(oscKey, 'volume', v)} />
-        {oscKey === 'osc2' && (
-          <Slider label="Semi" value={osc.semitone} min={0} max={24} step={1}
-            decimals={0} onChange={v => updateParam(oscKey, 'semitone', v)} />
-        )}
+        {/* Oct / Detune / Vol / Semi — horizontal row */}
+        <div className="osc-params-row">
+          <Selector label="Oct" options={OCTAVES} value={osc.octave}
+            onChange={v => updateParam(oscKey, 'octave', v)} />
+          <Slider label="Detune" value={osc.detune} min={-100} max={100} step={1}
+            decimals={0} unit=" ¢" onChange={v => updateParam(oscKey, 'detune', v)} />
+          <Slider label="Vol" value={osc.volume} min={0} max={1} step={0.01}
+            decimals={2} onChange={v => updateParam(oscKey, 'volume', v)} />
+          {oscKey === 'osc2' && (
+            <Slider label="Semi" value={osc.semitone} min={0} max={24} step={1}
+              decimals={0} onChange={v => updateParam(oscKey, 'semitone', v)} />
+          )}
+        </div>
+
       </div>
     </div>
   );
@@ -187,10 +189,12 @@ function NoisePanel() {
         <Toggle value={osc3.enabled} onChange={v => updateParam('osc3', 'enabled', v)} />
       </div>
       <div className={`osc-content ${!osc3.enabled ? 'disabled' : ''}`}>
-        <Selector label="Noise" options={NOISE_TYPES} value={osc3.type}
-          onChange={v => updateParam('osc3', 'type', v)} />
-        <Slider label="Vol" value={osc3.volume} min={0} max={1} step={0.01}
-          decimals={2} onChange={v => updateParam('osc3', 'volume', v)} />
+        <div className="osc-params-row">
+          <Selector label="Noise" options={NOISE_TYPES} value={osc3.type}
+            onChange={v => updateParam('osc3', 'type', v)} />
+          <Slider label="Vol" value={osc3.volume} min={0} max={1} step={0.01}
+            decimals={2} onChange={v => updateParam('osc3', 'volume', v)} />
+        </div>
       </div>
     </div>
   );
@@ -210,16 +214,18 @@ export function OscSection() {
       <div className="section-divider" />
       <div className="unison-panel">
         <div className="section-title">Unison</div>
-        <Selector
-          label="Voices"
-          options={[1,2,3,4,7].map(v => ({ value: v, label: String(v) }))}
-          value={uni.voices}
-          onChange={v => updateParam('unison', 'voices', v)}
-        />
-        <Slider label="Spread" value={uni.spread} min={0} max={100} step={1}
-          decimals={0} onChange={v => updateParam('unison', 'spread', v)} />
-        <Slider label="Width" value={uni.width} min={0} max={1} step={0.01}
-          decimals={2} onChange={v => updateParam('unison', 'width', v)} />
+        <div className="osc-params-row">
+          <Selector
+            label="Voices"
+            options={[1,2,3,4,7].map(v => ({ value: v, label: String(v) }))}
+            value={uni.voices}
+            onChange={v => updateParam('unison', 'voices', v)}
+          />
+          <Slider label="Spread" value={uni.spread} min={0} max={100} step={1}
+            decimals={0} onChange={v => updateParam('unison', 'spread', v)} />
+          <Slider label="Width" value={uni.width} min={0} max={1} step={0.01}
+            decimals={2} onChange={v => updateParam('unison', 'width', v)} />
+        </div>
       </div>
     </div>
   );
