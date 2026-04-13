@@ -1,16 +1,37 @@
-# React + Vite
+# ◈ SYNTH
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based polyphonic synthesizer built with React and [Tone.js](https://tonejs.github.io/).
 
-Currently, two official plugins are available:
+🔗 **Project repository:** https://github.com/ommadawn5150/synth
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **2 Oscillators** — sine / triangle / sawtooth / square waveforms, octave & detune controls, wavetable mode (load an image as a wavetable)
+- **Noise oscillator** — white, pink, and brown noise
+- **Unison** — up to 7 voices with configurable spread and stereo width
+- **Filter** — LP / HP / BP / Notch with cutoff, resonance, and roll-off slope (-12 / -24 / -48 dB/oct)
+- **ADSR Envelope**
+- **LFO** — modulates filter cutoff, pitch, or volume; 4 waveforms, polarity control
+- **Effects** — Chorus, Delay, Reverb
+- **Amp** — master volume + oscilloscope output display
+- **Step Sequencer** — up to 32 steps, BPM control, scale / root note selection, per-step note picker, pattern presets
+- **Keyboard** — on-screen piano keyboard; PC keyboard shortcut support
+- **4 Themes** — Dawn, Dusk, Mint, Void
+- **Preset system** — factory presets + save / load user presets
+- **PWA support** — installable as a standalone app
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting Started
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open http://localhost:5173 in your browser.
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
