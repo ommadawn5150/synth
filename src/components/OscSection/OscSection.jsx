@@ -29,6 +29,22 @@ const NOISE_TYPES = [
 
 // ── 3D wavetable canvas ───────────────────────────────────────────────────────
 
+const NUM_DISPLAY_FRAMES = 32;
+
+// Interpolate audio frames (sparse) into more display layers (dense)
+function interpolateDisplayFrames(audioFrames, n) {
+  const A = audioFrames.length;
+  return Array.from({ length: n }, (_, di) => {
+    const frac = (di / (n - 1)) * (A - 1);
+    const i0   = Math.floor(frac);
+    const i1   = Math.min(i0 + 1, A - 1);
+    const t    = frac - i0;
+    const s0   = audioFrames[i0];
+    const s1   = audioFrames[i1];
+    return s0.map((v, k) => v * (1 - t) + s1[k] * t);
+  });
+}
+
 function drawWavetable3D(canvas, frameSamples, pos) {
   const W = canvas.offsetWidth;
   const H = canvas.offsetHeight;
@@ -42,15 +58,17 @@ function drawWavetable3D(canvas, frameSamples, pos) {
   const N = frameSamples.length;
   if (N < 2) return;
 
-  // Perspective offsets per frame step
-  const PX = Math.max(2, Math.floor(W * 0.14 / (N - 1)));
-  const PY = Math.max(2, Math.floor(H * 0.38 / (N - 1)));
-  const padL   = 6;
-  const waveW  = W - (N - 1) * PX - padL - 4;
-  const waveHalf = (H - (N - 1) * PY) / 2 - 5;
+  // Fixed total perspective spread regardless of layer count
+  const padL    = 6;
+  const totalPX = Math.min(W * 0.20, 52);
+  const totalPY = Math.min(H * 0.42, 52);
+  const PX      = totalPX / (N - 1);
+  const PY      = totalPY / (N - 1);
+  const waveW   = W - totalPX - padL - 4;
+  const waveHalf = (H - totalPY) / 2 - 5;
 
   // fi=0 → front/bottom (wtPos=0), fi=N-1 → back/top (wtPos=1)
-  const baseY = H / 2 + ((N - 1) * PY) / 2;
+  const baseY = H / 2 + totalPY / 2;
   const getCoords = (fi) => ({
     x0: padL + fi * PX,
     yC: baseY - fi * PY,
@@ -128,15 +146,24 @@ function drawWavetable3D(canvas, frameSamples, pos) {
 }
 
 function WaveformCanvas3D({ frameSamples, oscKey }) {
-  const canvasRef = useRef(null);
+  const canvasRef       = useRef(null);
+  const displayRef      = useRef(null);    // interpolated display frames
   const { getWtDisplayPos } = useSynth();
+
+  // Recompute interpolated display frames when source changes
+  useEffect(() => {
+    displayRef.current = frameSamples
+      ? interpolateDisplayFrames(frameSamples, NUM_DISPLAY_FRAMES)
+      : null;
+  }, [frameSamples]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !frameSamples || frameSamples.length === 0) return;
     let rafId;
     const tick = () => {
-      drawWavetable3D(canvas, frameSamples, getWtDisplayPos(oscKey));
+      if (displayRef.current)
+        drawWavetable3D(canvas, displayRef.current, getWtDisplayPos(oscKey));
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
