@@ -12,8 +12,8 @@ export class SynthEngine {
 
   _defaultParams() {
     return {
-      osc1:   { type: 'sawtooth', octave: 0, detune: 0, volume: 0.8, enabled: true },
-      osc2:   { type: 'square',   octave: 0, semitone: 7, detune: 0, volume: 0.3, enabled: false },
+      osc1:   { type: 'sawtooth', octave: 0, detune: 0, volume: 0.8, enabled: true, wavetable: null },
+      osc2:   { type: 'square',   octave: 0, semitone: 7, detune: 0, volume: 0.3, enabled: false, wavetable: null },
       osc3:   { type: 'white', volume: 0, enabled: false },
       unison: { voices: 1, spread: 15, width: 0.5 },
       filter: { type: 'lowpass', frequency: 2000, Q: 1, rolloff: -24, enabled: true },
@@ -100,12 +100,14 @@ export class SynthEngine {
     const freq = Tone.Frequency(note).toFrequency();
     const osc1Gain = new Tone.Gain(osc1.volume).connect(envelope);
     const oscillator1 = new Tone.Oscillator({ type: osc1.type, frequency: freq * Math.pow(2, osc1.octave), detune: osc1.detune }).connect(osc1Gain);
+    if (osc1.wavetable) oscillator1.partials = osc1.wavetable;
     oscillator1.start(time);
 
     let oscillator2 = null, osc2Gain = null;
     if (osc2.enabled) {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       oscillator2 = new Tone.Oscillator({ type: osc2.type, frequency: freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12), detune: osc2.detune }).connect(osc2Gain);
+      if (osc2.wavetable) oscillator2.partials = osc2.wavetable;
       oscillator2.start(time);
     }
 
@@ -148,6 +150,7 @@ export class SynthEngine {
     if (osc1.enabled) {
       osc1Gain = new Tone.Gain(osc1.volume).connect(envelope);
       oscillator1 = new Tone.Oscillator({ type: osc1.type, frequency: freq * Math.pow(2, osc1.octave), detune: osc1.detune + detuneOffset }).connect(osc1Gain);
+      if (osc1.wavetable) oscillator1.partials = osc1.wavetable;
       oscillator1.start();
     }
 
@@ -156,6 +159,7 @@ export class SynthEngine {
       osc2Gain = new Tone.Gain(osc2.volume).connect(envelope);
       const osc2Freq = freq * Math.pow(2, osc2.octave) * Math.pow(2, osc2.semitone / 12);
       oscillator2 = new Tone.Oscillator({ type: osc2.type, frequency: osc2Freq, detune: osc2.detune + detuneOffset }).connect(osc2Gain);
+      if (osc2.wavetable) oscillator2.partials = osc2.wavetable;
       oscillator2.start();
     }
 
@@ -222,14 +226,28 @@ export class SynthEngine {
   // ─── Parameter Setters ───────────────────────────────────────────
   setOsc1(key, value) {
     this.params.osc1[key] = value;
-    if (key === 'volume') this.voices.forEach(vl => vl.forEach(v => v.osc1Gain?.gain.rampTo(value, 0.05)));
-    if (key === 'type')   this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc1) v.osc1.type = value; } catch(_){} }));
+    if (key === 'volume')
+      this.voices.forEach(vl => vl.forEach(v => v.osc1Gain?.gain.rampTo(value, 0.05)));
+    if (key === 'type' && !this.params.osc1.wavetable)
+      this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc1) v.osc1.type = value; } catch(_){} }));
+    if (key === 'wavetable')
+      this.voices.forEach(vl => vl.forEach(v => { try {
+        if (!v.osc1) return;
+        value ? (v.osc1.partials = value) : (v.osc1.type = this.params.osc1.type);
+      } catch(_){} }));
   }
 
   setOsc2(key, value) {
     this.params.osc2[key] = value;
-    if (key === 'volume') this.voices.forEach(vl => vl.forEach(v => v.osc2Gain?.gain.rampTo(value, 0.05)));
-    if (key === 'type')   this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc2) v.osc2.type = value; } catch(_){} }));
+    if (key === 'volume')
+      this.voices.forEach(vl => vl.forEach(v => v.osc2Gain?.gain.rampTo(value, 0.05)));
+    if (key === 'type' && !this.params.osc2.wavetable)
+      this.voices.forEach(vl => vl.forEach(v => { try { if (v.osc2) v.osc2.type = value; } catch(_){} }));
+    if (key === 'wavetable')
+      this.voices.forEach(vl => vl.forEach(v => { try {
+        if (!v.osc2) return;
+        value ? (v.osc2.partials = value) : (v.osc2.type = this.params.osc2.type);
+      } catch(_){} }));
   }
 
   setOsc3(key, value) {

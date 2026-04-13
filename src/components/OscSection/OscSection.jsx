@@ -1,7 +1,9 @@
+import { useState, useRef, useEffect } from 'react';
 import { Slider } from '../ui/Slider/Slider';
 import { Selector } from '../ui/Selector/Selector';
 import { Toggle } from '../ui/Toggle/Toggle';
 import { useSynth } from '../../contexts/SynthContext';
+import { imageFileToWavetable } from '../../utils/imageToWavetable';
 import './OscSection.css';
 
 const WAVEFORMS = [
@@ -25,9 +27,81 @@ const NOISE_TYPES = [
   { value: 'brown', label: 'B' },
 ];
 
+function WaveformCanvas({ samples }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !samples) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(255,107,53,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(W, H / 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FF6B35';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    samples.forEach((v, i) => {
+      const x = (i / (samples.length - 1)) * W;
+      const y = H / 2 - v * (H / 2 - 2);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }, [samples]);
+
+  return <canvas ref={canvasRef} className="osc-wave-canvas" width={220} height={30} />;
+}
+
 function OscPanel({ label, oscKey }) {
   const { params, updateParam } = useSynth();
   const osc = params[oscKey];
+  const fileInputRef = useRef(null);
+  const [waveformSamples, setWaveformSamples] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Sync preview when wavetable cleared externally (preset load etc.)
+  useEffect(() => {
+    if (!osc.wavetable) setWaveformSamples(null);
+  }, [osc.wavetable]);
+
+  async function handleImageFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setLoading(true);
+    try {
+      const { partials, waveformSamples: ws } = await imageFileToWavetable(file);
+      updateParam(oscKey, 'wavetable', partials);
+      setWaveformSamples(ws);
+    } catch (err) {
+      console.error('Wavetable error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function clearWavetable() {
+    updateParam(oscKey, 'wavetable', null);
+    setWaveformSamples(null);
+  }
+
+  const hasWavetable = !!osc.wavetable;
+  const waveOptions  = hasWavetable
+    ? [...WAVEFORMS, { value: 'custom', label: 'IMG' }]
+    : WAVEFORMS;
+
+  function handleWaveChange(v) {
+    if (hasWavetable) clearWavetable();
+    updateParam(oscKey, 'type', v);
+  }
 
   return (
     <div className="osc-panel">
@@ -36,8 +110,37 @@ function OscPanel({ label, oscKey }) {
         <Toggle value={osc.enabled} onChange={v => updateParam(oscKey, 'enabled', v)} />
       </div>
       <div className={`osc-content ${!osc.enabled ? 'disabled' : ''}`}>
-        <Selector label="Wave" options={WAVEFORMS} value={osc.type}
-          onChange={v => updateParam(oscKey, 'type', v)} />
+
+        <div className="osc-wave-row">
+          <Selector
+            label="Wave"
+            options={waveOptions}
+            value={hasWavetable ? 'custom' : osc.type}
+            onChange={handleWaveChange}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageFile}
+          />
+          <button
+            className={`osc-img-btn ${hasWavetable ? 'active' : ''}`}
+            title="Load image as wavetable"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {loading ? '…' : 'IMG'}
+          </button>
+        </div>
+
+        {waveformSamples && hasWavetable && (
+          <div className="osc-wave-preview">
+            <WaveformCanvas samples={waveformSamples} />
+            <button className="osc-wave-clear" onClick={clearWavetable}>×</button>
+          </div>
+        )}
+
         <Selector label="Oct" options={OCTAVES} value={osc.octave}
           onChange={v => updateParam(oscKey, 'octave', v)} />
         <Slider label="Detune" value={osc.detune} min={-100} max={100} step={1}

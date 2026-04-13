@@ -30,6 +30,65 @@
   pointer-events: none;
 }
 
+/* ── Wavetable IMG upload ──────────────────────── */
+.osc-wave-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.osc-wave-row .selector-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.osc-img-btn {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 7px;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  /* align with bottom of selector buttons */
+  align-self: flex-end;
+}
+
+.osc-img-btn:hover          { background: var(--accent); color: #fff; border-color: var(--accent); }
+.osc-img-btn.active         { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.osc-wave-preview {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.osc-wave-canvas {
+  flex: 1;
+  height: 30px;
+  display: block;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.osc-wave-clear {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.osc-wave-clear:hover { color: var(--text); }
+
 .osc2-toggle {
   background: var(--bg-section);
   border: 1px solid var(--border);
