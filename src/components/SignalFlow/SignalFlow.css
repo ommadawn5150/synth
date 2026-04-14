@@ -1,0 +1,109 @@
+.sf-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* ── Boxes ────────────────────────────────────────── */
+.sf-box {
+  fill: var(--bg-section);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.sf-box-osc {
+  fill: var(--bg-panel);
+  stroke: var(--border);
+}
+
+.sf-box-accent {
+  fill: color-mix(in srgb, var(--accent) 18%, var(--bg-section));
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+
+.sf-box-out {
+  fill: color-mix(in srgb, var(--accent) 25%, var(--bg-section));
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.sf-box-mod {
+  fill: var(--bg-panel);
+  stroke: color-mix(in srgb, var(--accent) 60%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.sf-box-ctrl {
+  fill: var(--bg-panel);
+  stroke: var(--text-dim);
+  stroke-width: 1;
+}
+
+/* ── Text ─────────────────────────────────────────── */
+.sf-text {
+  font-family: inherit;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  fill: var(--text);
+  text-anchor: middle;
+  dominant-baseline: auto;
+  pointer-events: none;
+}
+
+.sf-cat {
+  font-family: inherit;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  fill: var(--text-dim);
+  text-anchor: middle;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sf-dot-label {
+  font-family: inherit;
+  font-size: 7px;
+  font-weight: 600;
+  fill: color-mix(in srgb, var(--accent) 80%, var(--text));
+  text-anchor: start;
+  dominant-baseline: auto;
+  pointer-events: none;
+}
+
+/* ── Wires ────────────────────────────────────────── */
+.sf-wire {
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.sf-arrow {
+  fill: var(--text-dim);
+}
+
+.sf-wire-mod {
+  stroke: color-mix(in srgb, var(--accent) 70%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  fill: none;
+}
+
+.sf-arrow-mod {
+  fill: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.sf-wire-ctrl {
+  stroke: var(--text-dim);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
+
+.sf-arrow-ctrl {
+  fill: var(--text-dim);
+}

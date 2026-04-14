@@ -13,8 +13,8 @@
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  width: min(560px, 100%);
-  max-height: min(80vh, 640px);
+  width: min(680px, 100%);
+  max-height: min(85vh, 720px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -107,6 +107,37 @@
   white-space: nowrap;
   padding-top: 1px;
 }
+
+/* ── Signal Flow diagram ───────────── */
+.help-signal-flow {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px 10px 8px;
+  overflow-x: auto;
+}
+
+.help-signal-flow svg {
+  min-width: 400px;
+}
+
+.help-flow-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.help-legend-item {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.help-legend-audio { color: var(--text-dim); }
+.help-legend-mod   { color: var(--accent);   opacity: 0.75; }
+.help-legend-ctrl  { color: var(--text-dim); }
 
 .help-key-row {
   display: inline-block;

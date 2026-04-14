@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { SignalFlow } from '../SignalFlow/SignalFlow';
 import './HelpModal.css';
 
 function Section({ title, children }) {
@@ -36,6 +37,18 @@ export function HelpModal({ onClose }) {
         </div>
 
         <div className="help-modal-body">
+
+          <section className="help-section">
+            <h2 className="help-section-title">シグナルフロー — Signal Flow</h2>
+            <div className="help-signal-flow">
+              <SignalFlow />
+            </div>
+            <div className="help-flow-legend">
+              <span className="help-legend-item help-legend-audio">─── Audio Path</span>
+              <span className="help-legend-item help-legend-mod">- - - Modulation (LFO)</span>
+              <span className="help-legend-item help-legend-ctrl">· · · Note Trigger</span>
+            </div>
+          </section>
 
           <Section title="OSC 1 / OSC 2 — オシレーター">
             <Row term="Wave">波形の選択（∿ サイン / △ 三角 / / ノコギリ / ⊓ 矩形）</Row>
