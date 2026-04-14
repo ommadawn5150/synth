@@ -314,16 +314,19 @@ export class SynthEngine {
       const base = this.params.filter.frequency;
       const lo = Math.max(20, base * (1 - depth));
       const hi = Math.min(20000, base * (1 + depth));
-      this.lfo.min = polarity === '+' ? base : lo;
-      this.lfo.max = polarity === '-' ? base : hi;
+      // Use offsets relative to the intrinsic base value:
+      // actual_freq = intrinsic(base) + LFO_output → intended range [lo, hi]
+      this.lfo.min = polarity === '+' ? 0 : lo - base;
+      this.lfo.max = polarity === '-' ? 0 : hi - base;
       this._lfoTarget = this.filter.frequency;
       this.lfo.connect(this.filter.frequency);
     } else if (destination === 'amp') {
       const vol = this.params.amp.volume;
       const lo = Math.max(0, vol - depth);
       const hi = Math.min(1, vol + depth);
-      this.lfo.min = polarity === '+' ? vol : lo;
-      this.lfo.max = polarity === '-' ? vol : hi;
+      // Same relative-offset approach for gain
+      this.lfo.min = polarity === '+' ? 0 : lo - vol;
+      this.lfo.max = polarity === '-' ? 0 : hi - vol;
       this._lfoTarget = this.masterGain.gain;
       this.lfo.connect(this.masterGain.gain);
     } else if (destination === 'pitch') {
